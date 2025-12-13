@@ -360,7 +360,7 @@ class TaskExecutionEngine {
    * Load execution checkpoint
    * 
    * @param {string} checkpointPath - Path to checkpoint file
-   * @returns {Promise<Object>} Loaded checkpoint data
+   * @returns {Promise<Object|null>} Loaded checkpoint data or null if checkpoint doesn't exist
    */
   async loadCheckpoint(checkpointPath) {
     try {
@@ -370,6 +370,10 @@ class TaskExecutionEngine {
       this.log('info', 'Checkpoint loaded', { checkpointPath });
       return checkpoint;
     } catch (error) {
+      if (error.code === 'ENOENT') {
+        this.log('warn', 'Checkpoint file not found', { checkpointPath });
+        return null;
+      }
       this.log('error', 'Failed to load checkpoint', { error: error.message, checkpointPath });
       throw new TaskExecutionError('Failed to load checkpoint', error);
     }
@@ -535,22 +539,28 @@ class TaskExecutionEngine {
         const checkpointPath = options.checkpointPath || await this.findLatestCheckpoint();
         if (checkpointPath) {
           checkpoint = await this.loadCheckpoint(checkpointPath);
-          results.recoveredFromCheckpoint = true;
           
-          // Restore state from checkpoint
-          tasks = checkpoint.tasks || [];
-          currentTaskIndex = checkpoint.currentTaskIndex || 0;
-          results.completed = checkpoint.completedTasks || 0;
-          results.failed = checkpoint.failedTasks || 0;
-          results.executionLog = checkpoint.executionLog || [];
-          this.executionLog = [...results.executionLog];
-          
-          this.log('info', 'Resumed execution from checkpoint', {
-            checkpointPath,
-            currentTaskIndex,
-            completed: results.completed,
-            failed: results.failed
-          });
+          // If checkpoint loading failed or returned null, fall back to normal execution
+          if (!checkpoint) {
+            this.log('warn', 'No valid checkpoint found, starting fresh execution');
+          } else {
+            results.recoveredFromCheckpoint = true;
+            
+            // Restore state from checkpoint
+            tasks = checkpoint.tasks || [];
+            currentTaskIndex = checkpoint.currentTaskIndex || 0;
+            results.completed = checkpoint.completedTasks || 0;
+            results.failed = checkpoint.failedTasks || 0;
+            results.executionLog = checkpoint.executionLog || [];
+            this.executionLog = [...results.executionLog];
+            
+            this.log('info', 'Resumed execution from checkpoint', {
+              checkpointPath,
+              currentTaskIndex,
+              completed: results.completed,
+              failed: results.failed
+            });
+          }
         }
       }
       
