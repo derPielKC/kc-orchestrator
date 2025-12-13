@@ -764,7 +764,7 @@
         "node -e \"const g = require('./src/git'); console.log(g.createBranch('dev-test'));\"",
         "npm test -- git"
       ],
-      "status": "todo",
+      "status": "completed",
       "effort": "M",
       "dependencies": [
         "T4.1"

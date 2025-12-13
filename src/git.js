@@ -250,6 +250,262 @@ class GitRepositoryManager {
   }
 
   /**
+   * List all available git branches
+   * 
+   * @param {boolean} includeRemote - Include remote branches
+   * @returns {Object} Operation result with branch list
+   */
+  listBranches(includeRemote = false) {
+    if (!this.isGitRepository()) {
+      return {
+        success: false,
+        error: 'Not a git repository',
+        branches: [],
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    try {
+      const command = includeRemote ? 'git branch -a' : 'git branch';
+      const result = execSync(command, {
+        cwd: this.projectPath,
+        encoding: 'utf8',
+        timeout: this.timeout
+      });
+
+      const branches = result.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .map(line => ({
+          name: line.replace(/^\*\s*/, '').replace(/^remotes\/\w+\//, ''),
+          current: line.startsWith('*'),
+          remote: line.startsWith('remotes/')
+        }));
+
+      return {
+        success: true,
+        branches,
+        currentBranch: branches.find(b => b.current)?.name || null,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        branches: [],
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Delete a git branch
+   * 
+   * @param {string} branchName - Name of the branch to delete
+   * @param {boolean} force - Force deletion (use with caution)
+   * @returns {Object} Operation result
+   */
+  deleteBranch(branchName, force = false) {
+    if (!this.isGitRepository()) {
+      return {
+        success: false,
+        error: 'Not a git repository',
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    try {
+      // Check if branch exists and is not current branch
+      const branches = this.listBranches().branches;
+      const branchToDelete = branches.find(b => b.name === branchName && !b.current);
+      
+      if (!branchToDelete) {
+        return {
+          success: false,
+          error: `Branch ${branchName} does not exist or is currently checked out`,
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      const forceFlag = force ? '-D' : '-d';
+      execSync(`git branch ${forceFlag} ${branchName}`, {
+        cwd: this.projectPath,
+        encoding: 'utf8',
+        timeout: this.timeout
+      });
+
+      // Clear cache
+      this.clearCache();
+
+      return {
+        success: true,
+        branchName,
+        force,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      return {
+        success: false,
+        branchName,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Validate branch name according to git conventions
+   * 
+   * @param {string} branchName - Branch name to validate
+   * @param {string} prefix - Optional branch prefix
+   * @returns {Object} Validation result
+   */
+  validateBranchName(branchName, prefix = '') {
+    const validationResult = {
+      valid: true,
+      errors: [],
+      warnings: [],
+      normalizedName: branchName
+    };
+
+    // Check if empty
+    if (!branchName || typeof branchName !== 'string') {
+      validationResult.valid = false;
+      validationResult.errors.push('Branch name cannot be empty');
+      return validationResult;
+    }
+
+    // Apply prefix if provided
+    if (prefix) {
+      validationResult.normalizedName = `${prefix}${branchName}`;
+    }
+
+    // Check length (git has limits, but be reasonable)
+    if (validationResult.normalizedName.length > 100) {
+      validationResult.valid = false;
+      validationResult.errors.push('Branch name is too long (max 100 characters)');
+    }
+
+    // Check for invalid characters
+    const invalidChars = /[^\w\-\./]/;
+    if (invalidChars.test(validationResult.normalizedName)) {
+      validationResult.valid = false;
+      validationResult.errors.push('Branch name contains invalid characters');
+    }
+
+    // Check for git reserved names
+    const reservedNames = ['HEAD', 'master', 'main', 'develop', 'development'];
+    if (reservedNames.includes(validationResult.normalizedName.toLowerCase())) {
+      validationResult.warnings.push('Branch name matches a commonly used branch name');
+    }
+
+    // Check for leading/trailing whitespace or special chars
+    if (/^[^\w]/.test(validationResult.normalizedName) || /[^\w]$/.test(validationResult.normalizedName)) {
+      validationResult.warnings.push('Branch name should not start or end with special characters');
+    }
+
+    return validationResult;
+  }
+
+  /**
+   * Clean up merged branches
+   * 
+   * @param {string} baseBranch - Base branch to compare against
+   * @param {boolean} dryRun - Dry run (list branches without deleting)
+   * @returns {Object} Operation result
+   */
+  cleanupMergedBranches(baseBranch = 'main', dryRun = true) {
+    if (!this.isGitRepository()) {
+      return {
+        success: false,
+        error: 'Not a git repository',
+        deletedBranches: [],
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    try {
+      // Get all branches
+      const allBranches = this.listBranches().branches;
+      const localBranches = allBranches.filter(b => !b.remote && !b.current && b.name !== baseBranch);
+
+      if (localBranches.length === 0) {
+        return {
+          success: true,
+          message: 'No local branches to clean up',
+          deletedBranches: [],
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      // Check which branches are merged
+      const mergedBranches = [];
+      for (const branch of localBranches) {
+        try {
+          execSync(`git branch --merged ${baseBranch} | grep ${branch.name}`, {
+            cwd: this.projectPath,
+            encoding: 'utf8',
+            timeout: this.timeout
+          });
+          mergedBranches.push(branch.name);
+        } catch (error) {
+          // Branch not merged, skip
+        }
+      }
+
+      if (mergedBranches.length === 0) {
+        return {
+          success: true,
+          message: 'No merged branches found for cleanup',
+          mergedBranches,
+          deletedBranches: [],
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      // Dry run - just return what would be deleted
+      if (dryRun) {
+        return {
+          success: true,
+          message: 'Dry run - branches that would be deleted',
+          baseBranch,
+          mergedBranches,
+          deletedBranches: [],
+          timestamp: new Date().toISOString()
+        };
+      }
+
+      // Actually delete the branches
+      const deletedBranches = [];
+      for (const branchName of mergedBranches) {
+        try {
+          const result = this.deleteBranch(branchName, false);
+          if (result.success) {
+            deletedBranches.push(branchName);
+          }
+        } catch (error) {
+          // Continue with next branch
+        }
+      }
+
+      return {
+        success: true,
+        baseBranch,
+        mergedBranches,
+        deletedBranches,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        deletedBranches: [],
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
    * Commit changes to git repository
    * 
    * @param {string} message - Commit message

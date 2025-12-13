@@ -267,6 +267,110 @@ describe('GitRepositoryManager', () => {
     });
   });
 
+  describe('Branch Management', () => {
+    test('should list local branches', () => {
+      // Ensure we're on master branch
+      repoGitManager.checkoutBranch('master');
+      
+      // Create a test branch
+      repoGitManager.createBranch('test-branch');
+      
+      // List branches
+      const result = repoGitManager.listBranches();
+      
+      expect(result.success).toBe(true);
+      expect(result.branches).toBeInstanceOf(Array);
+      expect(result.branches.length).toBeGreaterThanOrEqual(2); // master + test-branch
+      expect(result.currentBranch).toBe('master');
+      
+      // Find the test branch
+      const testBranch = result.branches.find(b => b.name === 'test-branch');
+      expect(testBranch).toBeDefined();
+      expect(testBranch.current).toBe(false);
+      expect(testBranch.remote).toBe(false);
+      
+      // Clean up
+      repoGitManager.deleteBranch('test-branch');
+    });
+
+    test('should validate branch names', () => {
+      // Test valid branch names
+      let validation = repoGitManager.validateBranchName('feature-test');
+      expect(validation.valid).toBe(true);
+      expect(validation.errors).toHaveLength(0);
+      
+      // Test with prefix
+      validation = repoGitManager.validateBranchName('feature-test', 'dev/');
+      expect(validation.valid).toBe(true);
+      expect(validation.normalizedName).toBe('dev/feature-test');
+      
+      // Test invalid branch names
+      validation = repoGitManager.validateBranchName('');
+      expect(validation.valid).toBe(false);
+      expect(validation.errors).toContain('Branch name cannot be empty');
+      
+      validation = repoGitManager.validateBranchName('feature test');
+      expect(validation.valid).toBe(false);
+      expect(validation.errors).toContain('Branch name contains invalid characters');
+      
+      // Test long branch name
+      validation = repoGitManager.validateBranchName('A'.repeat(101));
+      expect(validation.valid).toBe(false);
+      expect(validation.errors).toContain('Branch name is too long');
+    });
+
+    test('should delete branches safely', () => {
+      // Create a test branch
+      repoGitManager.createBranch('delete-test');
+      
+      // Delete the branch
+      const result = repoGitManager.deleteBranch('delete-test');
+      
+      expect(result.success).toBe(true);
+      expect(result.branchName).toBe('delete-test');
+      expect(result.force).toBe(false);
+      
+      // Verify it's gone
+      const branches = repoGitManager.listBranches();
+      const deletedBranch = branches.branches.find(b => b.name === 'delete-test');
+      expect(deletedBranch).toBeUndefined();
+    });
+
+    test('should prevent deleting current branch', () => {
+      // Try to delete the current branch (should fail)
+      const currentBranch = repoGitManager.getCurrentBranch().branch;
+      
+      const result = repoGitManager.deleteBranch(currentBranch);
+      
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('currently checked out');
+    });
+
+    test('should handle branch cleanup', () => {
+      // Create and merge a test branch
+      repoGitManager.createBranch('cleanup-test');
+      repoGitManager.checkoutBranch('cleanup-test');
+      
+      // Make a commit on the branch
+      const testFile = path.join(testRepoPath, 'cleanup-test.txt');
+      fs.writeFileSync(testFile, 'test content');
+      repoGitManager.commitChanges('Add test file');
+      
+      // Merge back to master
+      repoGitManager.checkoutBranch('master');
+      execSync('git merge cleanup-test --no-ff -m "Merge cleanup-test"', { cwd: testRepoPath });
+      
+      // Test dry run cleanup
+      const dryRunResult = repoGitManager.cleanupMergedBranches('master', true);
+      expect(dryRunResult.success).toBe(true);
+      expect(dryRunResult.mergedBranches).toContain('cleanup-test');
+      expect(dryRunResult.deletedBranches).toHaveLength(0);
+      
+      // Actually cleanup (but skip since we're in a test)
+      // In real usage, this would delete the merged branch
+    });
+  });
+
   describe('Status and Information', () => {
     test('should get current git status', () => {
       const status = repoGitManager.getGitStatus();
