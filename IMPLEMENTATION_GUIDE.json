@@ -28,7 +28,7 @@
     },
     {
       "name": "Phase 7: Testing and Validation",
-      "description": "Create test suite and validate end-to-end functionality"
+      "description": "Create test suite, implement coverage reporting, and validate end-to-end functionality"
     },
     {
       "name": "Phase 8: Continuous Improvement (Agent Lightning)",
@@ -1589,6 +1589,49 @@
         "priority": "high",
         "generatedAt": "2024-12-13T11:58:00.000Z"
       }
+    },
+    {
+      "id": "T7.4",
+      "title": "Implement test coverage reporting",
+      "description": "Configure Jest coverage reporting with thresholds and automated enforcement",
+      "acceptanceCriteria": [
+        "Jest configuration with coverage thresholds (80% for lines, statements, functions, branches)",
+        "Coverage report generator script with summary output",
+        "Multiple coverage report formats (text, lcov, clover, json-summary)",
+        "Automated threshold checking with pass/fail output",
+        "Coverage badges and visualizations support",
+        "Integration with CI/CD pipeline"
+      ],
+      "constraints": {
+        "do": [
+          "Use standard Jest coverage configuration",
+          "Support multiple report formats",
+          "Implement configurable thresholds",
+          "Generate human-readable summaries"
+        ],
+        "dont": [
+          "Include test files in coverage calculation",
+          "Break existing test functionality",
+          "Add unnecessary complexity to configuration"
+        ]
+      },
+      "outputs": [
+        "jest.config.js",
+        "scripts/generate-coverage-report.js",
+        "coverage/ directory with reports",
+        "Coverage summary in console output"
+      ],
+      "checkSteps": [
+        "npm test -- --coverage",
+        "node scripts/generate-coverage-report.js",
+        "cat coverage/lcov.info | head -20",
+        "ls -la coverage/lcov-report/"
+      ],
+      "status": "completed",
+      "effort": "M",
+      "dependencies": [
+        "T7.1"
+      ]
     }
   ]
 }
