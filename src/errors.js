@@ -82,11 +82,52 @@ class ProviderError extends OrchestratorError {
   }
 }
 
+/**
+ * Ollama Client Error
+ * 
+ * Base error for Ollama client operations
+ */
+class OllamaClientError extends OrchestratorError {
+  constructor(message, cause) {
+    super(message, cause);
+    this.ollamaOperation = cause?.ollamaOperation;
+  }
+}
+
+/**
+ * Ollama Request Error
+ * 
+ * Thrown when there are issues with Ollama API requests
+ */
+class OllamaRequestError extends OllamaClientError {
+  constructor(message, cause) {
+    super(message, cause);
+    this.requestData = cause?.requestData;
+    this.responseStatus = cause?.responseStatus;
+  }
+}
+
+/**
+ * Ollama Response Error
+ * 
+ * Thrown when Ollama API returns invalid responses
+ */
+class OllamaResponseError extends OllamaClientError {
+  constructor(message, responseData, cause) {
+    super(message, cause);
+    this.responseData = responseData;
+    this.statusCode = cause?.statusCode;
+  }
+}
+
 module.exports = {
   OrchestratorError,
   TaskExecutionError,
   TaskValidationError,
   ConfigurationError,
   DiscoveryError,
-  ProviderError
+  ProviderError,
+  OllamaClientError,
+  OllamaRequestError,
+  OllamaResponseError
 };

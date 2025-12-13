@@ -105,7 +105,9 @@
       ],
       "status": "completed",
       "effort": "S",
-      "dependencies": ["T1.1"]
+      "dependencies": [
+        "T1.1"
+      ]
     },
     {
       "id": "T1.3",
@@ -138,7 +140,9 @@
       ],
       "status": "completed",
       "effort": "S",
-      "dependencies": ["T1.2"]
+      "dependencies": [
+        "T1.2"
+      ]
     },
     {
       "id": "T1.4",
@@ -174,7 +178,9 @@
       ],
       "status": "completed",
       "effort": "M",
-      "dependencies": ["T1.1"]
+      "dependencies": [
+        "T1.1"
+      ]
     },
     {
       "id": "T1.5",
@@ -212,7 +218,10 @@
       ],
       "status": "completed",
       "effort": "M",
-      "dependencies": ["T1.1", "T1.4"]
+      "dependencies": [
+        "T1.1",
+        "T1.4"
+      ]
     },
     {
       "id": "T1.6",
@@ -249,7 +258,9 @@
       ],
       "status": "completed",
       "effort": "S",
-      "dependencies": ["T1.7"]
+      "dependencies": [
+        "T1.7"
+      ]
     },
     {
       "id": "T1.7",
@@ -288,7 +299,9 @@
       ],
       "status": "completed",
       "effort": "S",
-      "dependencies": ["T1.1"]
+      "dependencies": [
+        "T1.1"
+      ]
     },
     {
       "id": "T2.1",
@@ -323,7 +336,9 @@
       ],
       "status": "completed",
       "effort": "S",
-      "dependencies": ["T1.1"]
+      "dependencies": [
+        "T1.1"
+      ]
     },
     {
       "id": "T2.2",
@@ -360,7 +375,9 @@
       ],
       "status": "completed",
       "effort": "M",
-      "dependencies": ["T2.1"]
+      "dependencies": [
+        "T2.1"
+      ]
     },
     {
       "id": "T2.3",
@@ -397,7 +414,9 @@
       ],
       "status": "completed",
       "effort": "M",
-      "dependencies": ["T2.1"]
+      "dependencies": [
+        "T2.1"
+      ]
     },
     {
       "id": "T2.4",
@@ -434,7 +453,9 @@
       ],
       "status": "completed",
       "effort": "M",
-      "dependencies": ["T2.1"]
+      "dependencies": [
+        "T2.1"
+      ]
     },
     {
       "id": "T2.5",
@@ -471,7 +492,9 @@
       ],
       "status": "completed",
       "effort": "M",
-      "dependencies": ["T2.1"]
+      "dependencies": [
+        "T2.1"
+      ]
     },
     {
       "id": "T2.6",
@@ -508,7 +531,13 @@
       ],
       "status": "completed",
       "effort": "M",
-      "dependencies": ["T2.1", "T2.2", "T2.3", "T2.4", "T2.5"]
+      "dependencies": [
+        "T2.1",
+        "T2.2",
+        "T2.3",
+        "T2.4",
+        "T2.5"
+      ]
     },
     {
       "id": "T3.1",
@@ -546,7 +575,10 @@
       ],
       "status": "todo",
       "effort": "M",
-      "dependencies": ["T1.4", "T2.6"]
+      "dependencies": [
+        "T1.4",
+        "T2.6"
+      ]
     },
     {
       "id": "T3.2",
@@ -581,7 +613,10 @@
       ],
       "status": "todo",
       "effort": "M",
-      "dependencies": ["T1.4", "T3.1"]
+      "dependencies": [
+        "T1.4",
+        "T3.1"
+      ]
     },
     {
       "id": "T3.3",
@@ -616,7 +651,9 @@
       ],
       "status": "todo",
       "effort": "M",
-      "dependencies": ["T1.4"]
+      "dependencies": [
+        "T1.4"
+      ]
     },
     {
       "id": "T3.4",
@@ -653,7 +690,11 @@
       ],
       "status": "todo",
       "effort": "M",
-      "dependencies": ["T3.1", "T3.2", "T3.3"]
+      "dependencies": [
+        "T3.1",
+        "T3.2",
+        "T3.3"
+      ]
     },
     {
       "id": "T4.1",
@@ -688,7 +729,9 @@
       ],
       "status": "todo",
       "effort": "S",
-      "dependencies": ["T1.1"]
+      "dependencies": [
+        "T1.1"
+      ]
     },
     {
       "id": "T4.2",
@@ -723,7 +766,9 @@
       ],
       "status": "todo",
       "effort": "M",
-      "dependencies": ["T4.1"]
+      "dependencies": [
+        "T4.1"
+      ]
     },
     {
       "id": "T4.3",
@@ -758,7 +803,9 @@
       ],
       "status": "todo",
       "effort": "M",
-      "dependencies": ["T4.2"]
+      "dependencies": [
+        "T4.2"
+      ]
     },
     {
       "id": "T5.1",
@@ -791,9 +838,11 @@
         "node -e \"const o = require('./src/ollama'); console.log(o.getModels());\"",
         "npm test -- ollama"
       ],
-      "status": "todo",
+      "status": "completed",
       "effort": "M",
-      "dependencies": ["T1.1"]
+      "dependencies": [
+        "T1.1"
+      ]
     },
     {
       "id": "T5.2",
@@ -831,7 +880,9 @@
       ],
       "status": "todo",
       "effort": "M",
-      "dependencies": ["T5.1"]
+      "dependencies": [
+        "T5.1"
+      ]
     },
     {
       "id": "T5.3",
@@ -868,7 +919,10 @@
       ],
       "status": "todo",
       "effort": "M",
-      "dependencies": ["T5.1", "T5.2"]
+      "dependencies": [
+        "T5.1",
+        "T5.2"
+      ]
     },
     {
       "id": "T5.4",
@@ -905,7 +959,11 @@
       ],
       "status": "todo",
       "effort": "L",
-      "dependencies": ["T5.1", "T5.2", "T5.3"]
+      "dependencies": [
+        "T5.1",
+        "T5.2",
+        "T5.3"
+      ]
     },
     {
       "id": "T5.5",
@@ -943,7 +1001,12 @@
       ],
       "status": "todo",
       "effort": "L",
-      "dependencies": ["T5.1", "T2.6", "T5.2", "T5.3"]
+      "dependencies": [
+        "T5.1",
+        "T2.6",
+        "T5.2",
+        "T5.3"
+      ]
     },
     {
       "id": "T6.1",
@@ -979,7 +1042,9 @@
       ],
       "status": "todo",
       "effort": "S",
-      "dependencies": ["T1.1"]
+      "dependencies": [
+        "T1.1"
+      ]
     },
     {
       "id": "T6.2",
@@ -1015,7 +1080,9 @@
       ],
       "status": "todo",
       "effort": "M",
-      "dependencies": ["T6.1"]
+      "dependencies": [
+        "T6.1"
+      ]
     },
     {
       "id": "T6.3",
@@ -1051,7 +1118,10 @@
       ],
       "status": "todo",
       "effort": "M",
-      "dependencies": ["T6.1", "T5.2"]
+      "dependencies": [
+        "T6.1",
+        "T5.2"
+      ]
     },
     {
       "id": "T7.1",
@@ -1088,7 +1158,21 @@
       ],
       "status": "todo",
       "effort": "L",
-      "dependencies": ["T1.1", "T1.2", "T1.3", "T1.4", "T1.5", "T1.6", "T1.7", "T2.1", "T2.2", "T2.3", "T2.4", "T2.5", "T2.6"]
+      "dependencies": [
+        "T1.1",
+        "T1.2",
+        "T1.3",
+        "T1.4",
+        "T1.5",
+        "T1.6",
+        "T1.7",
+        "T2.1",
+        "T2.2",
+        "T2.3",
+        "T2.4",
+        "T2.5",
+        "T2.6"
+      ]
     },
     {
       "id": "T7.2",
@@ -1124,7 +1208,12 @@
       ],
       "status": "todo",
       "effort": "L",
-      "dependencies": ["T7.1", "T3.4", "T4.3", "T5.2"]
+      "dependencies": [
+        "T7.1",
+        "T3.4",
+        "T4.3",
+        "T5.2"
+      ]
     },
     {
       "id": "T7.3",
@@ -1161,7 +1250,9 @@
       ],
       "status": "todo",
       "effort": "L",
-      "dependencies": ["T7.2"]
+      "dependencies": [
+        "T7.2"
+      ]
     },
     {
       "id": "T8.1",
@@ -1243,7 +1334,9 @@
       ],
       "status": "completed",
       "effort": "M",
-      "dependencies": ["T8.1"],
+      "dependencies": [
+        "T8.1"
+      ],
       "source": "agent-lightning",
       "metadata": {
         "recommendationId": "AGL-20241213-002",
@@ -1288,7 +1381,9 @@
       ],
       "status": "completed",
       "effort": "M",
-      "dependencies": ["T8.2"],
+      "dependencies": [
+        "T8.2"
+      ],
       "source": "agent-lightning",
       "metadata": {
         "recommendationId": "AGL-20241213-003",
@@ -1332,7 +1427,9 @@
       ],
       "status": "completed",
       "effort": "M",
-      "dependencies": ["T8.3"],
+      "dependencies": [
+        "T8.3"
+      ],
       "source": "agent-lightning",
       "metadata": {
         "recommendationId": "AGL-20241213-004",
@@ -1381,7 +1478,9 @@
       ],
       "status": "completed",
       "effort": "M",
-      "dependencies": ["T8.4"],
+      "dependencies": [
+        "T8.4"
+      ],
       "source": "agent-lightning",
       "metadata": {
         "recommendationId": "AGL-20241213-005",
@@ -1429,7 +1528,9 @@
       ],
       "status": "todo",
       "effort": "L",
-      "dependencies": ["T8.5"],
+      "dependencies": [
+        "T8.5"
+      ],
       "source": "agent-lightning",
       "metadata": {
         "recommendationId": "AGL-20241213-006",
