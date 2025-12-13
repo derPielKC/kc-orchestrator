@@ -120,6 +120,19 @@ class OllamaResponseError extends OllamaClientError {
   }
 }
 
+/**
+ * Log Summarization Error
+ * 
+ * Thrown when log summarization operations fail
+ */
+class LogSummarizationError extends OrchestratorError {
+  constructor(message, cause) {
+    super(message, cause);
+    this.logPath = cause?.logPath;
+    this.analysisMethod = cause?.analysisMethod;
+  }
+}
+
 module.exports = {
   OrchestratorError,
   TaskExecutionError,
@@ -129,5 +142,6 @@ module.exports = {
   ProviderError,
   OllamaClientError,
   OllamaRequestError,
-  OllamaResponseError
+  OllamaResponseError,
+  LogSummarizationError
 };

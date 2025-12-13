@@ -878,7 +878,7 @@
         "node -e \"const s = require('./src/summary'); console.log(s.summarizeLog('test-log.txt'));\"",
         "npm test -- summary"
       ],
-      "status": "todo",
+      "status": "completed",
       "effort": "M",
       "dependencies": [
         "T5.1"
