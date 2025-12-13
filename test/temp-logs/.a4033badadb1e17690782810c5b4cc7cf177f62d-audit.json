@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/tools/kc-orchestrator/test/temp-logs/.a4033badadb1e17690782810c5b4cc7cf177f62d-audit.json",
+    "files": [
+        {
+            "date": 1765632692255,
+            "name": "/tools/kc-orchestrator/test/temp-logs/kc-orchestrator-2025-12-13.log",
+            "hash": "edc8bf00ee01de94a2c60c178e0257179d70ce7110284ef65c82f544a06b6c34"
+        }
+    ],
+    "hashType": "sha256"
+}
