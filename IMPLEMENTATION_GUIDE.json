@@ -573,7 +573,7 @@
         "node -e \"const e = require('./src/engine'); console.log(e.executeTasks('test-project'));\"",
         "npm test -- engine"
       ],
-      "status": "todo",
+      "status": "completed",
       "effort": "M",
       "dependencies": [
         "T1.4",
@@ -611,7 +611,7 @@
         "node -e \"const s = require('./src/status'); console.log(s.getStatus('test-task'));\"",
         "npm test -- status"
       ],
-      "status": "todo",
+      "status": "completed",
       "effort": "M",
       "dependencies": [
         "T1.4",
@@ -649,7 +649,7 @@
         "node -e \"const v = require('./src/validation'); console.log(v.validateTask('test-task'));\"",
         "npm test -- validation"
       ],
-      "status": "todo",
+      "status": "completed",
       "effort": "M",
       "dependencies": [
         "T1.4"
@@ -688,7 +688,7 @@
         "node -e \"const l = require('./src/loop'); console.log(l.runLoop('test-project'));\"",
         "npm test -- loop"
       ],
-      "status": "todo",
+      "status": "completed",
       "effort": "M",
       "dependencies": [
         "T3.1",
@@ -727,7 +727,7 @@
         "node -e \"const g = require('./src/git'); console.log(g.isGitRepo());\"",
         "npm test -- git"
       ],
-      "status": "todo",
+      "status": "completed",
       "effort": "S",
       "dependencies": [
         "T1.1"
@@ -801,7 +801,7 @@
         "node -e \"const g = require('./src/git'); console.log(g.mergeBranch('dev-test', 'main'));\"",
         "npm test -- git"
       ],
-      "status": "todo",
+      "status": "completed",
       "effort": "M",
       "dependencies": [
         "T4.2"
