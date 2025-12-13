@@ -1,0 +1,170 @@
+{
+  "version": "1.0",
+  "triggers": {
+    "new_project": {
+      "description": "Triggered when no existing configuration is found",
+      "conditions": [
+        "!config.project",
+        "!fs.existsSync(path.join(projectPath, 'IMPLEMENTATION_GUIDE.json'))"
+      ]
+    },
+    "missing_project_name": {
+      "description": "Triggered when project name is missing or empty",
+      "conditions": [
+        "!config.project || config.project.trim() === ''"
+      ]
+    },
+    "missing_project_description": {
+      "description": "Triggered when project description is missing or empty",
+      "conditions": [
+        "!config.description || config.description.trim() === ''"
+      ]
+    },
+    "missing_implementation_guide": {
+      "description": "Triggered when IMPLEMENTATION_GUIDE.json doesn't exist",
+      "conditions": [
+        "!fs.existsSync(path.join(projectPath, 'IMPLEMENTATION_GUIDE.json'))"
+      ]
+    },
+    "empty_tasks": {
+      "description": "Triggered when tasks array is empty",
+      "conditions": [
+        "config.tasks && config.tasks.length === 0"
+      ]
+    },
+    "ambiguous_provider": {
+      "description": "Triggered when provider configuration is ambiguous",
+      "conditions": [
+        "!config.provider || config.provider === 'auto'"
+      ]
+    },
+    "missing_git_repo": {
+      "description": "Triggered when git repository is not detected",
+      "conditions": [
+        "!discovery.findRepositoryRoot(projectPath)"
+      ]
+    }
+  },
+  "questions": {
+    "project_name": {
+      "id": "project_name",
+      "text": "What is the name of this project?",
+      "type": "text",
+      "required": true,
+      "default": "path.basename(projectPath)",
+      "validation": "non-empty string",
+      "help": "The name should be short and descriptive (e.g., 'payment-service')",
+      "priority": 1
+    },
+    "project_description": {
+      "id": "project_description",
+      "text": "Please provide a brief description of this project",
+      "type": "text",
+      "required": true,
+      "default": "",
+      "validation": "non-empty string",
+      "help": "Describe the purpose and scope of this project",
+      "priority": 2
+    },
+    "create_implementation_guide": {
+      "id": "create_guide",
+      "text": "Should I create a default IMPLEMENTATION_GUIDE.json?",
+      "type": "confirm",
+      "required": true,
+      "default": "yes",
+      "validation": "['yes', 'no']",
+      "help": "This will create a basic structure that you can customize later",
+      "priority": 3
+    },
+    "provider_selection": {
+      "id": "provider",
+      "text": "Which AI provider should be used by default?",
+      "type": "choice",
+      "required": true,
+      "default": "auto",
+      "choices": ["auto", "codex", "claude", "vibe", "cursor-agent"],
+      "validation": "valid provider name",
+      "help": "Select 'auto' to use the fallback mechanism",
+      "priority": 4
+    },
+    "git_branch_strategy": {
+      "id": "branch_strategy",
+      "text": "What branch strategy should be used?",
+      "type": "choice",
+      "required": true,
+      "default": "feature",
+      "choices": ["feature", "dev", "main", "custom"],
+      "validation": "valid branch strategy",
+      "help": "Determines how development branches are created",
+      "priority": 5
+    },
+    "custom_branch_prefix": {
+      "id": "branch_prefix",
+      "text": "Enter custom branch prefix",
+      "type": "text",
+      "required": false,
+      "default": "dev/",
+      "validation": "valid branch prefix (alphanumeric + / - _)",
+      "help": "Used when 'custom' branch strategy is selected",
+      "priority": 6,
+      "conditional": "answers.branch_strategy === 'custom'"
+    },
+    "ollama_integration": {
+      "id": "ollama_enabled",
+      "text": "Enable Ollama integration for log summarization?",
+      "type": "confirm",
+      "required": true,
+      "default": "yes",
+      "validation": "['yes', 'no']",
+      "help": "Ollama can help analyze failures and suggest fixes",
+      "priority": 7
+    },
+    "parallel_execution": {
+      "id": "parallel_enabled",
+      "text": "Enable parallel task execution?",
+      "type": "confirm",
+      "required": true,
+      "default": "no",
+      "validation": "['yes', 'no']",
+      "help": "Parallel execution can improve performance but may be harder to debug",
+      "priority": 8
+    },
+    "max_concurrent_tasks": {
+      "id": "max_concurrent",
+      "text": "Maximum concurrent tasks (when parallel enabled)",
+      "type": "number",
+      "required": false,
+      "default": "3",
+      "validation": "number between 1 and 10",
+      "help": "How many tasks can run simultaneously",
+      "priority": 9,
+      "conditional": "answers.parallel_enabled === 'yes'"
+    }
+  },
+  "question_groups": [
+    {
+      "name": "basic_setup",
+      "description": "Basic project setup questions",
+      "questions": ["project_name", "project_description", "create_implementation_guide"],
+      "priority": 1
+    },
+    {
+      "name": "provider_config",
+      "description": "AI provider configuration",
+      "questions": ["provider_selection"],
+      "priority": 2
+    },
+    {
+      "name": "git_config",
+      "description": "Git and branching strategy",
+      "questions": ["git_branch_strategy", "custom_branch_prefix"],
+      "priority": 3
+    },
+    {
+      "name": "advanced_options",
+      "description": "Advanced configuration options",
+      "questions": ["ollama_integration", "parallel_execution", "max_concurrent_tasks"],
+      "priority": 4
+    }
+  ]
+}

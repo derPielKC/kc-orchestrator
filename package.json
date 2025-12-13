@@ -1,0 +1,25 @@
+{
+  "name": "kc-orchestrator",
+  "version": "0.1.0",
+  "description": "Universal CLI orchestrator for multi-project repositories",
+  "main": "src/index.js",
+  "bin": {
+    "kc-orchestrator": "bin/cli.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "jest",
+    "lint": "echo 'Linting not yet implemented'",
+    "build": "echo 'Build not yet implemented'"
+  },
+  "keywords": ["cli", "orchestrator", "ai", "automation"],
+  "author": "kc-orchestrator",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^11.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.5.0"
+  },
+  "type": "commonjs"
+}

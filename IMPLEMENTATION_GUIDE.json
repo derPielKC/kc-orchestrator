@@ -1,0 +1,1442 @@
+{
+  "project": "kc-orchestrator",
+  "description": "Universal CLI orchestrator for multi-project repositories",
+  "phases": [
+    {
+      "name": "Phase 1: Discovery and Configuration",
+      "description": "Setup project structure, discovery logic, and configuration management"
+    },
+    {
+      "name": "Phase 2: Provider Integration",
+      "description": "Implement multiple AI provider support with fallback mechanism"
+    },
+    {
+      "name": "Phase 3: Task Execution Loop",
+      "description": "Build the core task execution and status management system"
+    },
+    {
+      "name": "Phase 4: Git Workflow Integration",
+      "description": "Add git branch management and merge capabilities"
+    },
+    {
+      "name": "Phase 5: Ollama Integration",
+      "description": "Integrate Ollama for prompt drafting, summarization, and decision making"
+    },
+    {
+      "name": "Phase 6: Reporting and Error Handling",
+      "description": "Add comprehensive logging, reporting, and error recovery"
+    },
+    {
+      "name": "Phase 7: Testing and Validation",
+      "description": "Create test suite and validate end-to-end functionality"
+    },
+    {
+      "name": "Phase 8: Continuous Improvement (Agent Lightning)",
+      "description": "Implement continuous improvement loop using Agent Lightning for telemetry analysis and automated recommendations"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1.1",
+      "title": "Create project structure and package.json",
+      "description": "Setup Node.js project with proper structure, dependencies, and entry points",
+      "acceptanceCriteria": [
+        "package.json created with name, version, description, and scripts",
+        "src/ directory structure created",
+        "bin/ directory for CLI entry point",
+        "Basic .gitignore for Node.js projects",
+        "README.md with project overview"
+      ],
+      "constraints": {
+        "do": [
+          "Use modern Node.js (v18+) features",
+          "Include type definitions in package.json",
+          "Add common scripts: start, test, lint, build"
+        ],
+        "dont": [
+          "Add unnecessary dependencies upfront",
+          "Create complex build pipelines yet"
+        ]
+      },
+      "outputs": [
+        "package.json",
+        "src/index.js",
+        "bin/cli.js",
+        ".gitignore",
+        "README.md"
+      ],
+      "checkSteps": [
+        "cd /tools/kc-orchestrator && ls -la",
+        "cat package.json | grep -E '(name|version|description)'",
+        "test -f src/index.js && test -f bin/cli.js"
+      ],
+      "status": "completed",
+      "effort": "S",
+      "dependencies": []
+    },
+    {
+      "id": "T1.2",
+      "title": "Implement repository root discovery",
+      "description": "Create logic to find repository root from current working directory",
+      "acceptanceCriteria": [
+        "Function discovers git root by walking up directory tree",
+        "Handles edge cases (no git repo, permission errors)",
+        "Returns absolute path to repository root",
+        "Unit tests for discovery logic"
+      ],
+      "constraints": {
+        "do": [
+          "Use synchronous file system operations for CLI tools",
+          "Handle Windows/Linux/Mac path separators",
+          "Add timeout to prevent infinite loops"
+        ],
+        "dont": [
+          "Assume current directory is always in a git repo",
+          "Use async/await for this synchronous operation"
+        ]
+      },
+      "outputs": [
+        "src/discovery.js",
+        "test/discovery.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const d = require('./src/discovery'); console.log(d.findRepoRoot());\"",
+        "npm test -- discovery"
+      ],
+      "status": "completed",
+      "effort": "S",
+      "dependencies": ["T1.1"]
+    },
+    {
+      "id": "T1.3",
+      "title": "Implement project folder discovery",
+      "description": "Find all project folders containing IMPLEMENTATION_GUIDE.json files",
+      "acceptanceCriteria": [
+        "Scans repository for IMPLEMENTATION_GUIDE.json files",
+        "Returns list of project paths with metadata",
+        "Handles nested project structures",
+        "Excludes node_modules and common ignore patterns"
+      ],
+      "constraints": {
+        "do": [
+          "Use glob patterns for efficient searching",
+          "Cache results for performance",
+          "Include basic validation of found files"
+        ],
+        "dont": [
+          "Parse JSON files during discovery",
+          "Assume all projects use same structure"
+        ]
+      },
+      "outputs": [
+        "src/discovery.js (extended)",
+        "test/discovery.test.js (extended)"
+      ],
+      "checkSteps": [
+        "node -e \"const d = require('./src/discovery'); console.log(JSON.stringify(d.findProjects()));\"",
+        "npm test -- discovery"
+      ],
+      "status": "completed",
+      "effort": "S",
+      "dependencies": ["T1.2"]
+    },
+    {
+      "id": "T1.4",
+      "title": "Create configuration manager",
+      "description": "Build system to read/write orchestrator and project configurations",
+      "acceptanceCriteria": [
+        "Reads IMPLEMENTATION_GUIDE.json files",
+        "Validates JSON schema",
+        "Provides methods to update task statuses",
+        "Handles missing files gracefully",
+        "Supports interview mode for ambiguous configurations"
+      ],
+      "constraints": {
+        "do": [
+          "Use JSON schema validation",
+          "Implement atomic file writes",
+          "Add backup/restore functionality",
+          "Support both sync and async operations"
+        ],
+        "dont": [
+          "Modify files without validation",
+          "Assume all JSON files are valid"
+        ]
+      },
+      "outputs": [
+        "src/config.js",
+        "src/schemas/implementation-guide.schema.json",
+        "test/config.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const c = require('./src/config'); console.log(c.readGuide('/path/to/test.json'));\"",
+        "npm test -- config"
+      ],
+      "status": "completed",
+      "effort": "M",
+      "dependencies": ["T1.1"]
+    },
+    {
+      "id": "T1.5",
+      "title": "Implement interactive interview system",
+      "description": "Create system for interactive configuration when ambiguity is detected",
+      "acceptanceCriteria": [
+        "Detects ambiguous configuration scenarios",
+        "Asks clear, specific questions via CLI prompts",
+        "Validates user responses",
+        "Persists answers to configuration files",
+        "Supports both interactive and non-interactive modes"
+      ],
+      "constraints": {
+        "do": [
+          "Only trigger interview when genuine ambiguity exists",
+          "Ask minimal, focused questions",
+          "Provide sensible defaults",
+          "Support headless/non-interactive operation with env vars",
+          "Log interview decisions for audit trail"
+        ],
+        "dont": [
+          "Ask unnecessary questions",
+          "Interrupt automated workflows unnecessarily",
+          "Store sensitive information without encryption"
+        ]
+      },
+      "outputs": [
+        "src/interview.js",
+        "src/questions.js",
+        "test/interview.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const i = require('./src/interview'); console.log(i.detectAmbiguity({project: 'test'}));\"",
+        "npm test -- interview"
+      ],
+      "status": "completed",
+      "effort": "M",
+      "dependencies": ["T1.1", "T1.4"]
+    },
+    {
+      "id": "T1.6",
+      "title": "Define interview questions and triggers",
+      "description": "Create specific questions and conditions for triggering interview mode",
+      "acceptanceCriteria": [
+        "Defines clear triggers for interview mode (missing config, ambiguous settings)",
+        "Creates specific questions for common scenarios",
+        "Includes validation rules for responses",
+        "Provides examples and help text",
+        "Supports question prioritization"
+      ],
+      "constraints": {
+        "do": [
+          "Focus on essential configuration only",
+          "Use clear, non-technical language",
+          "Provide context for each question",
+          "Support question grouping by topic"
+        ],
+        "dont": [
+          "Ask about implementation details",
+          "Include questions that can be auto-detected",
+          "Create overly complex question trees"
+        ]
+      },
+      "outputs": [
+        "src/questions.js",
+        "config/questions.json",
+        "test/questions.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const q = require('./src/questions'); console.log(JSON.stringify(q.getQuestionsFor('missing-config')));\"",
+        "npm test -- questions"
+      ],
+      "status": "completed",
+      "effort": "S",
+      "dependencies": ["T1.7"]
+    },
+    {
+      "id": "T1.7",
+      "title": "Implement CLI argument parsing",
+      "description": "Setup command line interface with argument parsing and help",
+      "acceptanceCriteria": [
+        "Supports common CLI flags (--help, --version, --verbose)",
+        "Parses project-specific arguments",
+        "Validates input parameters",
+        "Generates help text automatically",
+        "Handles unknown arguments gracefully",
+        "Includes flags for interview mode control"
+      ],
+      "constraints": {
+        "do": [
+          "Use commander or similar CLI framework",
+          "Support both short and long flags",
+          "Include examples in help text",
+          "Add version from package.json",
+          "Support --non-interactive and --auto-answer flags"
+        ],
+        "dont": [
+          "Reinvent CLI parsing from scratch",
+          "Make required arguments overly complex"
+        ]
+      },
+      "outputs": [
+        "src/cli.js",
+        "bin/cli.js (updated)",
+        "test/cli.test.js"
+      ],
+      "checkSteps": [
+        "node bin/cli.js --help",
+        "node bin/cli.js --version",
+        "npm test -- cli"
+      ],
+      "status": "completed",
+      "effort": "S",
+      "dependencies": ["T1.1"]
+    },
+    {
+      "id": "T2.1",
+      "title": "Create CLI provider interface",
+      "description": "Define abstract interface for CLI-based AI providers with focus on stdin/stdout and exit codes",
+      "acceptanceCriteria": [
+        "Abstract base class with CLI-focused methods",
+        "Methods for prompt generation, CLI execution, output parsing",
+        "Standardized input (prompt files/stdin) and output (changes, logs, exit codes)",
+        "Provider health check via CLI version/test commands",
+        "Common error handling for CLI failures and timeouts"
+      ],
+      "constraints": {
+        "do": [
+          "Design for CLI tool integration (stdin/stdout/stderr)",
+          "Include comprehensive documentation with examples",
+          "Define clear contracts for input/output formats",
+          "Support both synchronous and asynchronous CLI execution"
+        ],
+        "dont": [
+          "Include API-specific logic in interface",
+          "Assume providers are always available as APIs"
+        ]
+      },
+      "outputs": [
+        "src/providers/Provider.js",
+        "src/providers/ProviderError.js"
+      ],
+      "checkSteps": [
+        "cat src/providers/Provider.js | grep -E '(generatePrompt|executeCLI|parseOutput|checkHealth)'",
+        "test -f src/providers/ProviderError.js"
+      ],
+      "status": "completed",
+      "effort": "S",
+      "dependencies": ["T1.1"]
+    },
+    {
+      "id": "T2.2",
+      "title": "Implement Codex CLI provider",
+      "description": "Create CLI wrapper for Codex tool with stdin/stdout integration",
+      "acceptanceCriteria": [
+        "Implements all Provider interface methods",
+        "Executes Codex via CLI with prompt files",
+        "Handles stdin/stdout/stderr streams",
+        "Parses CLI output for applied changes and logs",
+        "Returns meaningful exit codes",
+        "Includes provider-specific configuration (model, temperature, etc.)"
+      ],
+      "constraints": {
+        "do": [
+          "Use Codex CLI tool if available, fallback to API",
+          "Implement timeout and process management",
+          "Add comprehensive error handling for CLI failures",
+          "Support different Codex models via CLI flags",
+          "Handle large outputs with streaming"
+        ],
+        "dont": [
+          "Hardcode CLI paths or configurations",
+          "Assume Codex CLI is always installed"
+        ]
+      },
+      "outputs": [
+        "src/providers/CodexProvider.js",
+        "test/providers/codex.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const p = require('./src/providers/CodexProvider'); console.log(new p().checkHealth());\"",
+        "npm test -- providers/codex"
+      ],
+      "status": "completed",
+      "effort": "M",
+      "dependencies": ["T2.1"]
+    },
+    {
+      "id": "T2.3",
+      "title": "Implement Claude CLI provider",
+      "description": "Create CLI wrapper for Claude tool with stdin/stdout integration",
+      "acceptanceCriteria": [
+        "Implements all Provider interface methods",
+        "Executes Claude via CLI with prompt files",
+        "Handles stdin/stdout/stderr streams",
+        "Parses CLI output for responses and logs",
+        "Returns meaningful exit codes",
+        "Includes provider-specific configuration (model, system prompt, etc.)"
+      ],
+      "constraints": {
+        "do": [
+          "Use Claude CLI tool if available, fallback to API",
+          "Implement timeout and process management",
+          "Add comprehensive error handling for CLI failures",
+          "Support different Claude models via CLI flags",
+          "Handle conversation context via stdin"
+        ],
+        "dont": [
+          "Hardcode CLI paths or configurations",
+          "Assume Claude CLI is always installed"
+        ]
+      },
+      "outputs": [
+        "src/providers/ClaudeProvider.js",
+        "test/providers/claude.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const p = require('./src/providers/ClaudeProvider'); console.log(new p().checkHealth());\"",
+        "npm test -- providers/claude"
+      ],
+      "status": "completed",
+      "effort": "M",
+      "dependencies": ["T2.1"]
+    },
+    {
+      "id": "T2.4",
+      "title": "Implement Vibe CLI provider",
+      "description": "Create CLI wrapper for Vibe tool with stdin/stdout integration",
+      "acceptanceCriteria": [
+        "Implements all Provider interface methods",
+        "Executes Vibe via CLI with prompt files",
+        "Handles stdin/stdout/stderr streams",
+        "Parses CLI output for tool calls and responses",
+        "Returns meaningful exit codes",
+        "Includes provider-specific configuration (model, tools, etc.)"
+      ],
+      "constraints": {
+        "do": [
+          "Use Vibe CLI tool if available, fallback to API",
+          "Implement timeout and process management",
+          "Add comprehensive error handling for CLI failures",
+          "Support tool/function calling via CLI",
+          "Handle JSON and text responses appropriately"
+        ],
+        "dont": [
+          "Hardcode CLI paths or configurations",
+          "Assume Vibe CLI is always installed"
+        ]
+      },
+      "outputs": [
+        "src/providers/VibeProvider.js",
+        "test/providers/vibe.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const p = require('./src/providers/VibeProvider'); console.log(new p().checkHealth());\"",
+        "npm test -- providers/vibe"
+      ],
+      "status": "completed",
+      "effort": "M",
+      "dependencies": ["T2.1"]
+    },
+    {
+      "id": "T2.5",
+      "title": "Implement Cursor Agent CLI provider",
+      "description": "Create CLI wrapper for Cursor Agent tool with stdin/stdout integration",
+      "acceptanceCriteria": [
+        "Implements all Provider interface methods",
+        "Executes Cursor Agent via CLI with prompt files",
+        "Handles stdin/stdout/stderr streams",
+        "Parses CLI output for tool calls and responses",
+        "Returns meaningful exit codes",
+        "Includes provider-specific configuration (model, tools, etc.)"
+      ],
+      "constraints": {
+        "do": [
+          "Use Cursor Agent CLI tool if available",
+          "Implement timeout and process management",
+          "Add comprehensive error handling for CLI failures",
+          "Support tool/function calling via CLI",
+          "Handle JSON and text responses appropriately"
+        ],
+        "dont": [
+          "Hardcode CLI paths or configurations",
+          "Assume Cursor Agent CLI is always installed"
+        ]
+      },
+      "outputs": [
+        "src/providers/CursorAgentProvider.js",
+        "test/providers/cursor-agent.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const p = require('./src/providers/CursorAgentProvider'); console.log(new p().checkHealth());\"",
+        "npm test -- providers/cursor-agent"
+      ],
+      "status": "completed",
+      "effort": "M",
+      "dependencies": ["T2.1"]
+    },
+    {
+      "id": "T2.6",
+      "title": "Implement provider fallback mechanism",
+      "description": "Create system to try multiple providers with fallback logic",
+      "acceptanceCriteria": [
+        "Tries providers in configured order (Codex, Claude, Vibe, Cursor Agent)",
+        "Handles provider failures gracefully",
+        "Logs fallback decisions with reasons",
+        "Supports provider priority configuration",
+        "Includes timeout for provider responses",
+        "Tracks provider success/failure statistics"
+      ],
+      "constraints": {
+        "do": [
+          "Implement circuit breaker pattern",
+          "Add provider health monitoring",
+          "Support provider-specific timeouts",
+          "Log detailed fallback reasons and timing",
+          "Include Cursor Agent in fallback chain"
+        ],
+        "dont": [
+          "Retry failed providers indefinitely",
+          "Assume all providers have same capabilities"
+        ]
+      },
+      "outputs": [
+        "src/providers/ProviderManager.js",
+        "test/providers/manager.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const pm = require('./src/providers/ProviderManager'); console.log(pm.getAvailableProviders());\"",
+        "npm test -- providers/manager"
+      ],
+      "status": "completed",
+      "effort": "M",
+      "dependencies": ["T2.1", "T2.2", "T2.3", "T2.4", "T2.5"]
+    },
+    {
+      "id": "T3.1",
+      "title": "Create MVP task execution engine",
+      "description": "Build simple task execution engine focused on sequential processing with provider fallback",
+      "acceptanceCriteria": [
+        "Reads tasks from configuration in order",
+        "Executes tasks sequentially (no dependency graph for MVP)",
+        "Updates task statuses (todo -> in_progress -> completed/failed)",
+        "Handles task failures and retries with same provider",
+        "Falls back to next provider on failure",
+        "Logs execution progress and provider decisions"
+      ],
+      "constraints": {
+        "do": [
+          "Implement simple sequential execution for MVP",
+          "Add task timeout support",
+          "Focus on reliability over parallelism",
+          "Include basic error recovery and retry logic",
+          "Log detailed provider execution and fallback decisions"
+        ],
+        "dont": [
+          "Execute tasks without validation",
+          "Implement complex dependency resolution yet",
+          "Add parallel execution for MVP"
+        ]
+      },
+      "outputs": [
+        "src/engine.js",
+        "test/engine.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const e = require('./src/engine'); console.log(e.executeTasks('test-project'));\"",
+        "npm test -- engine"
+      ],
+      "status": "todo",
+      "effort": "M",
+      "dependencies": ["T1.4", "T2.6"]
+    },
+    {
+      "id": "T3.2",
+      "title": "Implement task status tracking",
+      "description": "Create system to track and persist task execution status",
+      "acceptanceCriteria": [
+        "Tracks task status (todo, in_progress, completed, failed)",
+        "Persists status to IMPLEMENTATION_GUIDE.json",
+        "Supports status queries and filtering",
+        "Handles concurrent status updates",
+        "Includes status change history"
+      ],
+      "constraints": {
+        "do": [
+          "Use atomic file operations",
+          "Implement optimistic locking",
+          "Add validation for status transitions",
+          "Support bulk status updates"
+        ],
+        "dont": [
+          "Allow invalid status transitions",
+          "Lose status data on failures"
+        ]
+      },
+      "outputs": [
+        "src/status.js",
+        "test/status.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const s = require('./src/status'); console.log(s.getStatus('test-task'));\"",
+        "npm test -- status"
+      ],
+      "status": "todo",
+      "effort": "M",
+      "dependencies": ["T1.4", "T3.1"]
+    },
+    {
+      "id": "T3.3",
+      "title": "Create task validation system",
+      "description": "Build system to validate task outputs and acceptance criteria",
+      "acceptanceCriteria": [
+        "Validates task outputs exist",
+        "Checks acceptance criteria programmatically",
+        "Runs checkSteps commands",
+        "Generates validation reports",
+        "Supports custom validation scripts"
+      ],
+      "constraints": {
+        "do": [
+          "Implement safe command execution",
+          "Add timeout for validation checks",
+          "Support both automatic and manual validation",
+          "Log detailed validation results"
+        ],
+        "dont": [
+          "Execute arbitrary shell commands unsafely",
+          "Assume all validation can be automated"
+        ]
+      },
+      "outputs": [
+        "src/validation.js",
+        "test/validation.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const v = require('./src/validation'); console.log(v.validateTask('test-task'));\"",
+        "npm test -- validation"
+      ],
+      "status": "todo",
+      "effort": "M",
+      "dependencies": ["T1.4"]
+    },
+    {
+      "id": "T3.4",
+      "title": "Implement MVP execution loop",
+      "description": "Create simple main loop for sequential task execution with validation",
+      "acceptanceCriteria": [
+        "Executes tasks sequentially one at a time",
+        "For each task: generates prompt -> runs provider -> validates output -> updates status",
+        "Handles provider retries and fallback within task execution",
+        "Continues to next task on success, stops on unrecoverable failure",
+        "Logs detailed execution progress and decisions"
+      ],
+      "constraints": {
+        "do": [
+          "Implement simple sequential processing (no batching for MVP)",
+          "Add clear progress reporting to console",
+          "Support dry-run mode for testing",
+          "Include proper cleanup on termination",
+          "Log each step: prompt generation, provider execution, validation"
+        ],
+        "dont": [
+          "Run indefinitely without termination conditions",
+          "Lose state on interruption",
+          "Implement complex batching or parallelism for MVP"
+        ]
+      },
+      "outputs": [
+        "src/loop.js",
+        "test/loop.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const l = require('./src/loop'); console.log(l.runLoop('test-project'));\"",
+        "npm test -- loop"
+      ],
+      "status": "todo",
+      "effort": "M",
+      "dependencies": ["T3.1", "T3.2", "T3.3"]
+    },
+    {
+      "id": "T4.1",
+      "title": "Implement git repository detection",
+      "description": "Create logic to detect and validate git repositories",
+      "acceptanceCriteria": [
+        "Detects git repositories",
+        "Validates git installation",
+        "Checks repository health",
+        "Handles edge cases (corrupt repos, no git)",
+        "Returns git status information"
+      ],
+      "constraints": {
+        "do": [
+          "Use git CLI commands",
+          "Add comprehensive error handling",
+          "Support both local and remote repos",
+          "Cache git information"
+        ],
+        "dont": [
+          "Assume git is always available",
+          "Execute arbitrary git commands unsafely"
+        ]
+      },
+      "outputs": [
+        "src/git.js",
+        "test/git.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const g = require('./src/git'); console.log(g.isGitRepo());\"",
+        "npm test -- git"
+      ],
+      "status": "todo",
+      "effort": "S",
+      "dependencies": ["T1.1"]
+    },
+    {
+      "id": "T4.2",
+      "title": "Implement branch management",
+      "description": "Create system to manage git branches for development",
+      "acceptanceCriteria": [
+        "Creates development branches",
+        "Switches between branches",
+        "Lists available branches",
+        "Handles branch naming conventions",
+        "Supports branch cleanup"
+      ],
+      "constraints": {
+        "do": [
+          "Use safe git operations",
+          "Add branch name validation",
+          "Support custom branch prefixes",
+          "Handle merge conflicts gracefully"
+        ],
+        "dont": [
+          "Force operations that could cause data loss",
+          "Assume specific branch naming conventions"
+        ]
+      },
+      "outputs": [
+        "src/git.js (extended)",
+        "test/git.test.js (extended)"
+      ],
+      "checkSteps": [
+        "node -e \"const g = require('./src/git'); console.log(g.createBranch('dev-test'));\"",
+        "npm test -- git"
+      ],
+      "status": "todo",
+      "effort": "M",
+      "dependencies": ["T4.1"]
+    },
+    {
+      "id": "T4.3",
+      "title": "Implement merge workflow",
+      "description": "Create system to merge development branches to main after validation",
+      "acceptanceCriteria": [
+        "Validates branch can be merged",
+        "Performs merge operation",
+        "Handles merge conflicts",
+        "Supports pre-merge checks",
+        "Logs merge results"
+      ],
+      "constraints": {
+        "do": [
+          "Implement conflict detection",
+          "Add merge validation hooks",
+          "Support both fast-forward and regular merges",
+          "Include comprehensive error handling"
+        ],
+        "dont": [
+          "Force merges that could cause issues",
+          "Assume main branch is always clean"
+        ]
+      },
+      "outputs": [
+        "src/git.js (extended)",
+        "test/git.test.js (extended)"
+      ],
+      "checkSteps": [
+        "node -e \"const g = require('./src/git'); console.log(g.mergeBranch('dev-test', 'main'));\"",
+        "npm test -- git"
+      ],
+      "status": "todo",
+      "effort": "M",
+      "dependencies": ["T4.2"]
+    },
+    {
+      "id": "T5.1",
+      "title": "Implement Ollama client",
+      "description": "Create client for interacting with Ollama API",
+      "acceptanceCriteria": [
+        "Connects to Ollama API",
+        "Handles model selection",
+        "Manages conversation context",
+        "Supports different Ollama models",
+        "Includes error handling"
+      ],
+      "constraints": {
+        "do": [
+          "Use environment variables for configuration",
+          "Implement retry logic",
+          "Support both local and remote Ollama",
+          "Add model capability detection"
+        ],
+        "dont": [
+          "Hardcode model names",
+          "Assume Ollama is always available"
+        ]
+      },
+      "outputs": [
+        "src/ollama.js",
+        "test/ollama.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const o = require('./src/ollama'); console.log(o.getModels());\"",
+        "npm test -- ollama"
+      ],
+      "status": "todo",
+      "effort": "M",
+      "dependencies": ["T1.1"]
+    },
+    {
+      "id": "T5.2",
+      "title": "Implement log summarization with Ollama (MVP priority)",
+      "description": "Create system to use Ollama for summarizing execution logs and extracting root causes",
+      "acceptanceCriteria": [
+        "Analyzes execution logs from failed tasks",
+        "Generates concise summaries of what happened",
+        "Identifies potential root causes",
+        "Suggests specific fixes or improvements",
+        "Handles large log files with chunking",
+        "Integrates with execution loop for automatic analysis"
+      ],
+      "constraints": {
+        "do": [
+          "Focus on practical, actionable summaries",
+          "Implement log chunking for large files",
+          "Add summary validation and quality checks",
+          "Support both success and failure analysis",
+          "Integrate tightly with execution loop"
+        ],
+        "dont": [
+          "Include sensitive data in summaries",
+          "Generate overly verbose or theoretical analysis",
+          "Make Ollama a required dependency for basic operation"
+        ]
+      },
+      "outputs": [
+        "src/summary.js",
+        "test/summary.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const s = require('./src/summary'); console.log(s.summarizeLog('test-log.txt'));\"",
+        "npm test -- summary"
+      ],
+      "status": "todo",
+      "effort": "M",
+      "dependencies": ["T5.1"]
+    },
+    {
+      "id": "T5.3",
+      "title": "Implement fix-prompt drafting with Ollama (secondary priority)",
+      "description": "Create system to use Ollama for drafting fix prompts based on failure analysis",
+      "acceptanceCriteria": [
+        "Analyzes failed task execution and validation results",
+        "Generates specific, actionable fix prompts",
+        "Includes context from original task and error logs",
+        "Supports different prompt templates for common failure types",
+        "Handles prompt validation and quality checking"
+      ],
+      "constraints": {
+        "do": [
+          "Focus on practical, specific fixes",
+          "Use structured templates for consistency",
+          "Add prompt validation and length checks",
+          "Support context injection from task and logs",
+          "Make this optional - don't block execution if unavailable"
+        ],
+        "dont": [
+          "Generate overly generic or theoretical prompts",
+          "Include sensitive information in prompts",
+          "Make Ollama required for basic prompt generation"
+        ]
+      },
+      "outputs": [
+        "src/prompt.js",
+        "test/prompt.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const p = require('./src/prompt'); console.log(p.draftFixPrompt('test-task', 'test-error'));\"",
+        "npm test -- prompt"
+      ],
+      "status": "todo",
+      "effort": "M",
+      "dependencies": ["T5.1", "T5.2"]
+    },
+    {
+      "id": "T5.4",
+      "title": "Implement outcome judging with Ollama (deferred)",
+      "description": "Create optional system to evaluate task outcomes using Ollama",
+      "acceptanceCriteria": [
+        "Evaluates task completion quality when requested",
+        "Assesses acceptance criteria compliance",
+        "Generates quality scores and suggestions",
+        "Handles ambiguous outcomes gracefully",
+        "Operates as optional enhancement, not required for execution"
+      ],
+      "constraints": {
+        "do": [
+          "Make this completely optional - don't block execution",
+          "Use structured evaluation criteria",
+          "Add scoring validation",
+          "Include comprehensive error handling",
+          "Provide clear opt-in mechanism"
+        ],
+        "dont": [
+          "Make subjective judgments without criteria",
+          "Override human judgment or validation checks",
+          "Make Ollama required for basic operation"
+        ]
+      },
+      "outputs": [
+        "src/judge.js",
+        "test/judge.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const j = require('./src/judge'); console.log(j.judgeOutcome('test-task'));\"",
+        "npm test -- judge"
+      ],
+      "status": "todo",
+      "effort": "L",
+      "dependencies": ["T5.1", "T5.2", "T5.3"]
+    },
+    {
+      "id": "T5.5",
+      "title": "Implement provider selection with Ollama (deferred)",
+      "description": "Create optional system for AI-assisted provider selection",
+      "acceptanceCriteria": [
+        "Analyzes task requirements when requested",
+        "Evaluates provider capabilities and past performance",
+        "Makes informed provider selection suggestions",
+        "Handles provider availability",
+        "Logs selection reasoning for audit trail",
+        "Operates as optional enhancement to manual configuration"
+      ],
+      "constraints": {
+        "do": [
+          "Make this completely optional - use configured order by default",
+          "Use provider capability database and performance history",
+          "Add fallback for Ollama unavailability",
+          "Support custom selection criteria",
+          "Provide clear opt-in mechanism"
+        ],
+        "dont": [
+          "Override manual provider configuration",
+          "Make provider selection unpredictable",
+          "Make Ollama required for basic operation"
+        ]
+      },
+      "outputs": [
+        "src/selector.js",
+        "test/selector.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const s = require('./src/selector'); console.log(s.selectProvider('test-task'));\"",
+        "npm test -- selector"
+      ],
+      "status": "todo",
+      "effort": "L",
+      "dependencies": ["T5.1", "T2.6", "T5.2", "T5.3"]
+    },
+    {
+      "id": "T6.1",
+      "title": "Create logging system",
+      "description": "Build comprehensive logging system for all operations",
+      "acceptanceCriteria": [
+        "Logs to both console and files",
+        "Supports different log levels",
+        "Includes timestamps and context",
+        "Handles log rotation",
+        "Supports structured logging"
+      ],
+      "constraints": {
+        "do": [
+          "Use winston or similar logging framework",
+          "Implement log level filtering",
+          "Add context tracking",
+          "Support both development and production logging"
+        ],
+        "dont": [
+          "Log sensitive information",
+          "Create excessive log files"
+        ]
+      },
+      "outputs": [
+        "src/logger.js",
+        "config/logging.js",
+        "test/logger.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const l = require('./src/logger'); l.info('Test message');\"",
+        "npm test -- logger"
+      ],
+      "status": "todo",
+      "effort": "S",
+      "dependencies": ["T1.1"]
+    },
+    {
+      "id": "T6.2",
+      "title": "Implement error handling and recovery",
+      "description": "Create robust error handling and recovery mechanisms",
+      "acceptanceCriteria": [
+        "Catches and logs all errors",
+        "Implements recovery strategies",
+        "Supports error classification",
+        "Handles both expected and unexpected errors",
+        "Provides meaningful error messages"
+      ],
+      "constraints": {
+        "do": [
+          "Use custom error classes",
+          "Implement error context preservation",
+          "Add recovery hooks",
+          "Support error escalation"
+        ],
+        "dont": [
+          "Swallow important errors",
+          "Expose sensitive error details"
+        ]
+      },
+      "outputs": [
+        "src/errors.js",
+        "src/recovery.js",
+        "test/errors.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const e = require('./src/errors'); console.log(new e.OrchestratorError('test'));\"",
+        "npm test -- errors"
+      ],
+      "status": "todo",
+      "effort": "M",
+      "dependencies": ["T6.1"]
+    },
+    {
+      "id": "T6.3",
+      "title": "Create reporting system",
+      "description": "Build system to generate execution reports and summaries",
+      "acceptanceCriteria": [
+        "Generates HTML/JSON/Markdown reports",
+        "Includes task execution statistics",
+        "Shows provider usage and performance",
+        "Supports custom report templates",
+        "Handles report delivery"
+      ],
+      "constraints": {
+        "do": [
+          "Use templating engine for reports",
+          "Implement report caching",
+          "Add report validation",
+          "Support both real-time and batch reporting"
+        ],
+        "dont": [
+          "Include sensitive data in reports",
+          "Generate reports without validation"
+        ]
+      },
+      "outputs": [
+        "src/reporting.js",
+        "templates/report.hbs",
+        "test/reporting.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const r = require('./src/reporting'); console.log(r.generateReport('test-session'));\"",
+        "npm test -- reporting"
+      ],
+      "status": "todo",
+      "effort": "M",
+      "dependencies": ["T6.1", "T5.2"]
+    },
+    {
+      "id": "T7.1",
+      "title": "Create unit test suite",
+      "description": "Build comprehensive unit tests for all modules",
+      "acceptanceCriteria": [
+        "Tests all major functions and classes",
+        "Achieves >80% code coverage",
+        "Includes edge case testing",
+        "Supports mocking for external dependencies",
+        "Generates coverage reports"
+      ],
+      "constraints": {
+        "do": [
+          "Use Jest or similar testing framework",
+          "Implement test organization by module",
+          "Add test documentation",
+          "Support both unit and integration tests"
+        ],
+        "dont": [
+          "Test implementation details",
+          "Create overly complex test setups"
+        ]
+      },
+      "outputs": [
+        "test/*.test.js (all modules)",
+        "jest.config.js",
+        ".nycrc or similar coverage config"
+      ],
+      "checkSteps": [
+        "npm test",
+        "npm run coverage",
+        "cat coverage/report.txt | grep 'Coverage:'"
+      ],
+      "status": "todo",
+      "effort": "L",
+      "dependencies": ["T1.1", "T1.2", "T1.3", "T1.4", "T1.5", "T1.6", "T1.7", "T2.1", "T2.2", "T2.3", "T2.4", "T2.5", "T2.6"]
+    },
+    {
+      "id": "T7.2",
+      "title": "Create integration test suite",
+      "description": "Build end-to-end integration tests for major workflows",
+      "acceptanceCriteria": [
+        "Tests complete workflows (discovery to execution)",
+        "Validates provider integration",
+        "Tests git workflow scenarios",
+        "Includes error recovery testing",
+        "Generates integration test reports"
+      ],
+      "constraints": {
+        "do": [
+          "Use test containers for isolation",
+          "Implement test data setup/teardown",
+          "Add performance benchmarks",
+          "Support both happy path and error scenarios"
+        ],
+        "dont": [
+          "Test external API dependencies directly",
+          "Create tests that take too long to run"
+        ]
+      },
+      "outputs": [
+        "test/integration/*.test.js",
+        "test/setup.js",
+        "test/teardown.js"
+      ],
+      "checkSteps": [
+        "npm run test:integration",
+        "cat test-reports/integration.txt"
+      ],
+      "status": "todo",
+      "effort": "L",
+      "dependencies": ["T7.1", "T3.4", "T4.3", "T5.2"]
+    },
+    {
+      "id": "T7.3",
+      "title": "Implement validation and acceptance testing",
+      "description": "Create final validation tests for production readiness",
+      "acceptanceCriteria": [
+        "Validates all acceptance criteria from implementation guide",
+        "Tests production-like scenarios",
+        "Includes performance testing",
+        "Generates final validation report",
+        "Supports manual validation workflows"
+      ],
+      "constraints": {
+        "do": [
+          "Use real-world test data",
+          "Implement comprehensive scenario testing",
+          "Add validation checklists",
+          "Support both automated and manual validation"
+        ],
+        "dont": [
+          "Skip important validation steps",
+          "Assume all scenarios can be automated"
+        ]
+      },
+      "outputs": [
+        "test/validation.js",
+        "test/acceptance.js",
+        "docs/validation-checklist.md"
+      ],
+      "checkSteps": [
+        "npm run validate",
+        "cat validation-report.md",
+        "npm run acceptance"
+      ],
+      "status": "todo",
+      "effort": "L",
+      "dependencies": ["T7.2"]
+    },
+    {
+      "id": "T8.1",
+      "title": "Implement telemetry capture system",
+      "description": "Create TelemetryManager class to capture structured events from orchestrator runs with redaction of sensitive information",
+      "acceptanceCriteria": [
+        "TelemetryManager class implemented with startRun, logEvent, and logRunCompletion methods",
+        "Sensitive information (secrets, paths, tokens) is properly redacted",
+        "Telemetry data stored in .kc-orchestrator/runs/<timestamp>/ directory",
+        "Events stored as JSONL files with proper structure",
+        "Run summaries generated and saved"
+      ],
+      "constraints": {
+        "do": [
+          "Use JSONL format for event storage",
+          "Implement comprehensive redaction for sensitive data",
+          "Store telemetry in organized directory structure",
+          "Include timestamps for all events"
+        ],
+        "dont": [
+          "Store raw secrets or environment variables",
+          "Include absolute paths in telemetry",
+          "Log sensitive user data"
+        ]
+      },
+      "outputs": [
+        "src/telemetry/TelemetryManager.js",
+        ".kc-orchestrator/runs/<timestamp>/events.jsonl",
+        ".kc-orchestrator/runs/<timestamp>/summary.json"
+      ],
+      "checkSteps": [
+        "node -e \"const TM = require('./src/telemetry/TelemetryManager'); console.log('TelemetryManager loaded');\"",
+        "ls -la .kc-orchestrator/runs/ | head -5",
+        "cat .kc-orchestrator/runs/*/summary.json | head -10"
+      ],
+      "status": "completed",
+      "effort": "M",
+      "dependencies": [],
+      "source": "agent-lightning",
+      "metadata": {
+        "recommendationId": "AGL-20241213-001",
+        "category": "telemetry",
+        "priority": "high",
+        "generatedAt": "2024-12-13T11:58:00.000Z"
+      }
+    },
+    {
+      "id": "T8.2",
+      "title": "Create run summarization functionality",
+      "description": "Implement RunSummarizer class to analyze telemetry data and generate markdown reports highlighting pain points",
+      "acceptanceCriteria": [
+        "RunSummarizer class implemented with generateSummaryReport method",
+        "Analysis identifies high failure rates, retries, fallbacks, and long-running tasks",
+        "Markdown reports generated with clear sections and tables",
+        "Pain points categorized by severity (high, medium, low)",
+        "Reports include provider performance statistics"
+      ],
+      "constraints": {
+        "do": [
+          "Use clear markdown formatting for reports",
+          "Include statistical analysis of run data",
+          "Highlight most critical pain points",
+          "Provide actionable insights"
+        ],
+        "dont": [
+          "Include raw sensitive data in reports",
+          "Make assumptions about root causes",
+          "Generate overly verbose reports"
+        ]
+      },
+      "outputs": [
+        "src/telemetry/RunSummarizer.js",
+        ".kc-orchestrator/improvement-reports/report-*/summary-report.md"
+      ],
+      "checkSteps": [
+        "node -e \"const RS = require('./src/telemetry/RunSummarizer'); console.log('RunSummarizer loaded');\"",
+        "ls -la .kc-orchestrator/improvement-reports/ | head -5",
+        "head -20 .kc-orchestrator/improvement-reports/report-*/summary-report.md"
+      ],
+      "status": "completed",
+      "effort": "M",
+      "dependencies": ["T8.1"],
+      "source": "agent-lightning",
+      "metadata": {
+        "recommendationId": "AGL-20241213-002",
+        "category": "analysis",
+        "priority": "high",
+        "generatedAt": "2024-12-13T11:58:00.000Z"
+      }
+    },
+    {
+      "id": "T8.3",
+      "title": "Add Agent Lightning integration",
+      "description": "Implement AgentLightningIntegration class to invoke Agent Lightning CLI and parse recommendations",
+      "acceptanceCriteria": [
+        "AgentLightningIntegration class implemented with invokeAgentLightning method",
+        "Configurable CLI path via environment variable AGENT_LIGHTNING_CLI",
+        "Handles both JSON and markdown response formats",
+        "Graceful fallback when Agent Lightning is not available",
+        "Input files prepared with proper structure"
+      ],
+      "constraints": {
+        "do": [
+          "Use child_process for CLI invocation",
+          "Handle errors gracefully",
+          "Support configuration via environment variables",
+          "Provide clear error messages"
+        ],
+        "dont": [
+          "Assume Agent Lightning is always available",
+          "Store sensitive data in input files",
+          "Make blocking calls without timeouts"
+        ]
+      },
+      "outputs": [
+        "src/telemetry/AgentLightningIntegration.js",
+        ".kc-orchestrator/agent-lightning/input/*",
+        ".kc-orchestrator/agent-lightning/output/*"
+      ],
+      "checkSteps": [
+        "node -e \"const AGL = require('./src/telemetry/AgentLightningIntegration'); console.log('AgentLightningIntegration loaded');\"",
+        "echo $AGENT_LIGHTNING_CLI || echo 'AGENT_LIGHTNING_CLI not set'",
+        "ls -la .kc-orchestrator/agent-lightning/ | head -5"
+      ],
+      "status": "completed",
+      "effort": "M",
+      "dependencies": ["T8.2"],
+      "source": "agent-lightning",
+      "metadata": {
+        "recommendationId": "AGL-20241213-003",
+        "category": "integration",
+        "priority": "medium",
+        "generatedAt": "2024-12-13T11:58:00.000Z"
+      }
+    },
+    {
+      "id": "T8.4",
+      "title": "Implement improvement task generation",
+      "description": "Create ImprovementTaskGenerator class to convert Agent Lightning recommendations into IMPLEMENTATION_GUIDE.json tasks",
+      "acceptanceCriteria": [
+        "ImprovementTaskGenerator class implemented with generateImprovementTasks method",
+        "Tasks generated with proper structure matching existing tasks",
+        "Duplicate detection based on content hashing and title similarity",
+        "Tasks added to Continuous Improvement phase",
+        "Content hash stored for future duplicate detection"
+      ],
+      "constraints": {
+        "do": [
+          "Follow existing task structure in IMPLEMENTATION_GUIDE.json",
+          "Generate unique task IDs",
+          "Include proper acceptance criteria and constraints",
+          "Add source and metadata fields"
+        ],
+        "dont": [
+          "Overwrite existing tasks",
+          "Generate tasks without proper validation",
+          "Create circular dependencies"
+        ]
+      },
+      "outputs": [
+        "src/telemetry/ImprovementTaskGenerator.js",
+        "IMPLEMENTATION_GUIDE.json (updated)"
+      ],
+      "checkSteps": [
+        "node -e \"const ITG = require('./src/telemetry/ImprovementTaskGenerator'); console.log('ImprovementTaskGenerator loaded');\"",
+        "grep -c 'T8\\.' IMPLEMENTATION_GUIDE.json",
+        "jq '.tasks[] | select(.id | startswith(\"T8\")) | .title' IMPLEMENTATION_GUIDE.json"
+      ],
+      "status": "completed",
+      "effort": "M",
+      "dependencies": ["T8.3"],
+      "source": "agent-lightning",
+      "metadata": {
+        "recommendationId": "AGL-20241213-004",
+        "category": "task-generation",
+        "priority": "medium",
+        "generatedAt": "2024-12-13T11:58:00.000Z"
+      }
+    },
+    {
+      "id": "T8.5",
+      "title": "Add improve CLI command",
+      "description": "Implement kc-orchestrator improve command to run continuous improvement analysis",
+      "acceptanceCriteria": [
+        "improve command added to CLI with proper options",
+        "Command aggregates telemetry from recent runs",
+        "Generates summary reports and improvement reports",
+        "Invokes Agent Lightning when available",
+        "Updates IMPLEMENTATION_GUIDE.json with new tasks",
+        "Updates NEXTSESSION_PROMPT.md with improvement information",
+        "Supports dry-run mode"
+      ],
+      "constraints": {
+        "do": [
+          "Use existing telemetry and analysis classes",
+          "Provide clear progress feedback",
+          "Handle errors gracefully",
+          "Support project filtering"
+        ],
+        "dont": [
+          "Modify existing tasks in IMPLEMENTATION_GUIDE.json",
+          "Overwrite existing reports without backup",
+          "Make assumptions about Agent Lightning availability"
+        ]
+      },
+      "outputs": [
+        "src/telemetry/cli/improve.js",
+        "bin/cli.js (updated)",
+        ".kc-orchestrator/improvement-reports/report-*/improvement-report.md",
+        "NEXTSESSION_PROMPT.md (updated)"
+      ],
+      "checkSteps": [
+        "kc-orchestrator improve --help",
+        "kc-orchestrator improve --last 1 --dry-run",
+        "ls -la .kc-orchestrator/improvement-reports/ | head -5",
+        "head -20 NEXTSESSION_PROMPT.md | grep -A 5 'Continuous Improvement'"
+      ],
+      "status": "completed",
+      "effort": "M",
+      "dependencies": ["T8.4"],
+      "source": "agent-lightning",
+      "metadata": {
+        "recommendationId": "AGL-20241213-005",
+        "category": "cli",
+        "priority": "medium",
+        "generatedAt": "2024-12-13T11:58:00.000Z"
+      }
+    },
+    {
+      "id": "T8.6",
+      "title": "Add unit tests for telemetry system",
+      "description": "Create comprehensive unit tests for telemetry capture, redaction, summarization, and task generation",
+      "acceptanceCriteria": [
+        "Unit tests for TelemetryManager with mock data",
+        "Tests for redaction functionality covering secrets, paths, and tokens",
+        "Tests for RunSummarizer analysis and report generation",
+        "Tests for AgentLightningIntegration response parsing",
+        "Tests for ImprovementTaskGenerator task creation and deduplication",
+        "All tests pass with jest test suite"
+      ],
+      "constraints": {
+        "do": [
+          "Use jest testing framework",
+          "Mock external dependencies",
+          "Test both success and error cases",
+          "Maintain high code coverage"
+        ],
+        "dont": [
+          "Include sensitive data in test files",
+          "Create tests that depend on external services",
+          "Write tests that modify production data"
+        ]
+      },
+      "outputs": [
+        "test/telemetry/TelemetryManager.test.js",
+        "test/telemetry/RunSummarizer.test.js",
+        "test/telemetry/AgentLightningIntegration.test.js",
+        "test/telemetry/ImprovementTaskGenerator.test.js",
+        "test/telemetry/cli/improve.test.js"
+      ],
+      "checkSteps": [
+        "npm test -- telemetry",
+        "jest --listTests | grep telemetry",
+        "jest --coverage | grep telemetry"
+      ],
+      "status": "todo",
+      "effort": "L",
+      "dependencies": ["T8.5"],
+      "source": "agent-lightning",
+      "metadata": {
+        "recommendationId": "AGL-20241213-006",
+        "category": "testing",
+        "priority": "high",
+        "generatedAt": "2024-12-13T11:58:00.000Z"
+      }
+    }
+  ]
+}

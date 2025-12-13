@@ -1,0 +1,409 @@
+const { ProviderTimeoutError, ProviderExecutionError } = require('./Provider');
+const { CodexProvider } = require('./CodexProvider');
+const { ClaudeProvider } = require('./ClaudeProvider');
+const { VibeProvider } = require('./VibeProvider');
+const { CursorAgentProvider } = require('./CursorAgentProvider');
+
+/**
+ * Provider Manager - Handles provider selection, fallback, and execution
+ * 
+ * This class implements a robust provider fallback mechanism that tries multiple
+ * AI providers in sequence when failures occur, with comprehensive logging and
+ * performance tracking.
+ */
+class ProviderManager {
+  /**
+   * Constructor for ProviderManager
+   * 
+   * @param {object} options - Configuration options
+   * @param {Array} options.providerOrder - Order of providers to try
+   * @param {number} options.timeout - Global timeout in ms
+   * @param {boolean} options.verbose - Enable verbose logging
+   */
+  constructor(options = {}) {
+    this.providerOrder = options.providerOrder || ['Codex', 'Claude', 'Vibe', 'CursorAgent'];
+    this.timeout = options.timeout || 120000; // 120 seconds default
+    this.verbose = options.verbose || false;
+    this.providerInstances = {};
+    this.providerStats = {};
+    
+    // Initialize provider instances
+    this._initializeProviders();
+  }
+  
+  /**
+   * Initialize provider instances based on configured order
+   */
+  _initializeProviders() {
+    const providerMap = {
+      'Codex': CodexProvider,
+      'Claude': ClaudeProvider,
+      'Vibe': VibeProvider,
+      'CursorAgent': CursorAgentProvider
+    };
+    
+    this.providerOrder.forEach(providerName => {
+      if (providerMap[providerName]) {
+        try {
+          this.providerInstances[providerName] = new providerMap[providerName]({
+            timeout: this.timeout
+          });
+          this.providerStats[providerName] = {
+            attempts: 0,
+            successes: 0,
+            failures: 0,
+            lastUsed: null,
+            lastSuccess: null,
+            lastFailure: null
+          };
+        } catch (error) {
+          console.warn(`Failed to initialize provider ${providerName}: ${error.message}`);
+        }
+      } else {
+        console.warn(`Unknown provider in configuration: ${providerName}`);
+      }
+    });
+    
+    if (this.verbose) {
+      console.log(`ProviderManager initialized with ${Object.keys(this.providerInstances).length} providers:`);
+      console.log(`- Order: ${this.providerOrder.join(' > ')}`);
+      console.log(`- Timeout: ${this.timeout}ms`);
+    }
+  }
+  
+  /**
+   * Get available providers
+   * 
+   * @returns {Array} List of available provider names
+   */
+  getAvailableProviders() {
+    return Object.keys(this.providerInstances);
+  }
+  
+  /**
+   * Get provider statistics
+   * 
+   * @param {string} providerName - Optional provider name to get stats for
+   * @returns {object} Statistics for all providers or specific provider
+   */
+  getProviderStats(providerName = null) {
+    if (providerName) {
+      return this.providerStats[providerName] || null;
+    }
+    return this.providerStats;
+  }
+  
+  /**
+   * Check health of all providers
+   * 
+   * @returns {Promise<object>} Health status of all providers
+   */
+  async checkAllProviderHealth() {
+    const healthResults = {};
+    
+    for (const [providerName, provider] of Object.entries(this.providerInstances)) {
+      try {
+        const isHealthy = await provider.checkHealth();
+        healthResults[providerName] = {
+          healthy: isHealthy,
+          timestamp: new Date().toISOString()
+        };
+        
+        if (this.verbose) {
+          console.log(`✅ ${providerName} health check: ${isHealthy ? 'PASS' : 'FAIL'}`);
+        }
+      } catch (error) {
+        healthResults[providerName] = {
+          healthy: false,
+          error: error.message,
+          timestamp: new Date().toISOString()
+        };
+        
+        if (this.verbose) {
+          console.log(`❌ ${providerName} health check failed: ${error.message}`);
+        }
+      }
+    }
+    
+    return healthResults;
+  }
+  
+  /**
+   * Execute a task with provider fallback
+   * 
+   * @param {object} task - Task to execute
+   * @param {object} context - Execution context
+   * @param {number} maxRetries - Maximum number of retries per provider
+   * @returns {Promise<object>} Task execution result with fallback information
+   */
+  async executeWithFallback(task, context = {}, maxRetries = 3) {
+    const startTime = Date.now();
+    const fallbackLog = [];
+    let lastError = null;
+    
+    if (this.verbose) {
+      console.log(`🚀 Starting task ${task.id} with fallback strategy`);
+      console.log(`📋 Provider order: ${this.providerOrder.join(' > ')}`);
+    }
+    
+    // Try each provider in order
+    for (const providerName of this.providerOrder) {
+      const provider = this.providerInstances[providerName];
+      
+      if (!provider) {
+        if (this.verbose) {
+          console.log(`⚠️  Skipping ${providerName} - not available`);
+        }
+        continue;
+      }
+      
+      // Update stats
+      this.providerStats[providerName].attempts++;
+      this.providerStats[providerName].lastUsed = new Date().toISOString();
+      
+      if (this.verbose) {
+        console.log(`🔄 Trying ${providerName} (attempt ${this.providerStats[providerName].attempts})`);
+      }
+      
+      try {
+        const result = await provider.executeTask(task, {
+          ...context,
+          maxRetries: maxRetries
+        });
+        
+        // Success!
+        this.providerStats[providerName].successes++;
+        this.providerStats[providerName].lastSuccess = new Date().toISOString();
+        
+        const endTime = Date.now();
+        
+        if (this.verbose) {
+          console.log(`✅ ${providerName} succeeded in ${endTime - startTime}ms`);
+        }
+        
+        return {
+          success: true,
+          provider: providerName,
+          result: result,
+          fallbackLog: fallbackLog,
+          executionTime: endTime - startTime,
+          timestamp: new Date().toISOString()
+        };
+        
+      } catch (error) {
+        // Failure - add to fallback log and continue
+        this.providerStats[providerName].failures++;
+        this.providerStats[providerName].lastFailure = new Date().toISOString();
+        lastError = error;
+        
+        const errorInfo = {
+          provider: providerName,
+          error: error.message,
+          timestamp: new Date().toISOString()
+        };
+        
+        if (error instanceof ProviderTimeoutError) {
+          errorInfo.type = 'timeout';
+          errorInfo.details = `Timeout after ${provider.timeout}ms`;
+        } else if (error instanceof ProviderExecutionError) {
+          errorInfo.type = 'execution';
+          errorInfo.details = error.result || {};
+        } else {
+          errorInfo.type = 'unknown';
+        }
+        
+        fallbackLog.push(errorInfo);
+        
+        if (this.verbose) {
+          console.log(`❌ ${providerName} failed: ${error.message}`);
+          console.log(`🔄 Falling back to next provider...`);
+        }
+        
+        continue;
+      }
+    }
+    
+    // If we get here, all providers failed
+    const endTime = Date.now();
+    
+    if (this.verbose) {
+      console.log(`💥 All providers failed for task ${task.id}`);
+      console.log(`📋 Fallback log:`);
+      fallbackLog.forEach((log, index) => {
+        console.log(`  ${index + 1}. ${log.provider}: ${log.error} (${log.type})`);
+      });
+    }
+    
+    return {
+      success: false,
+      error: lastError ? lastError.message : 'All providers failed',
+      fallbackLog: fallbackLog,
+      executionTime: endTime - startTime,
+      timestamp: new Date().toISOString()
+    };
+  }
+  
+  /**
+   * Execute a task with circuit breaker pattern
+   * 
+   * @param {object} task - Task to execute
+   * @param {object} context - Execution context
+   * @param {object} circuitBreaker - Circuit breaker configuration
+   * @returns {Promise<object>} Task execution result
+   */
+  async executeWithCircuitBreaker(task, context = {}, circuitBreaker = {}) {
+    const { failureThreshold = 3, resetTimeout = 300000 } = circuitBreaker;
+    
+    // Check if any providers are in circuit breaker state
+    const now = Date.now();
+    const availableProviders = [];
+    
+    for (const providerName of this.providerOrder) {
+      const provider = this.providerInstances[providerName];
+      const stats = this.providerStats[providerName];
+      
+      if (!provider) continue;
+      
+      // Check if provider is in circuit breaker state
+      if (stats.lastFailure) {
+        const lastFailureTime = new Date(stats.lastFailure).getTime();
+        const consecutiveFailures = stats.failures - (stats.successes > 0 ? 1 : 0);
+        
+        if (consecutiveFailures >= failureThreshold) {
+          const timeSinceFailure = now - lastFailureTime;
+          
+          if (timeSinceFailure < resetTimeout) {
+            if (this.verbose) {
+              console.log(`🚫 ${providerName} in circuit breaker state until ${new Date(lastFailureTime + resetTimeout)}`);
+            }
+            continue; // Skip this provider
+          } else {
+            // Reset circuit breaker
+            stats.failures = 0;
+            if (this.verbose) {
+              console.log(`🔄 ${providerName} circuit breaker reset`);
+            }
+          }
+        }
+      }
+      
+      availableProviders.push(providerName);
+    }
+    
+    if (availableProviders.length === 0) {
+      throw new Error('All providers in circuit breaker state');
+    }
+    
+    // Execute with available providers - override the provider order temporarily
+    const originalProviderOrder = this.providerOrder;
+    this.providerOrder = availableProviders;
+    
+    try {
+      return await this.executeWithFallback(task, context, circuitBreaker.maxRetries);
+    } finally {
+      // Restore original provider order
+      this.providerOrder = originalProviderOrder;
+    }
+  }
+  
+  /**
+   * Get the best available provider based on statistics
+   * 
+   * @returns {string|null} Best provider name or null if none available
+   */
+  getBestAvailableProvider() {
+    const availableProviders = Object.keys(this.providerInstances);
+    
+    if (availableProviders.length === 0) {
+      return null;
+    }
+    
+    // Simple algorithm: prefer providers with highest success rate
+    // and most recent success
+    let bestProvider = null;
+    let bestScore = -Infinity;
+    
+    availableProviders.forEach(providerName => {
+      const stats = this.providerStats[providerName];
+      
+      // Calculate score based on success rate and recency
+      const successRate = stats.attempts > 0 ? stats.successes / stats.attempts : 0;
+      const recencyBonus = stats.lastSuccess ? 0.1 : 0;
+      const score = successRate + recencyBonus;
+      
+      if (score > bestScore) {
+        bestScore = score;
+        bestProvider = providerName;
+      }
+    });
+    
+    return bestProvider;
+  }
+  
+  /**
+   * Execute a task with the best available provider
+   * 
+   * @param {object} task - Task to execute
+   * @param {object} context - Execution context
+   * @returns {Promise<object>} Task execution result
+   */
+  async executeWithBestProvider(task, context = {}) {
+    const bestProvider = this.getBestAvailableProvider();
+    
+    if (!bestProvider) {
+      throw new Error('No available providers');
+    }
+    
+    if (this.verbose) {
+      console.log(`🎯 Selected best provider: ${bestProvider}`);
+    }
+    
+    const provider = this.providerInstances[bestProvider];
+    
+    // Update stats
+    this.providerStats[bestProvider].attempts++;
+    this.providerStats[bestProvider].lastUsed = new Date().toISOString();
+    
+    try {
+      const result = await provider.executeTask(task, context);
+      this.providerStats[bestProvider].successes++;
+      this.providerStats[bestProvider].lastSuccess = new Date().toISOString();
+      return {
+        success: true,
+        provider: bestProvider,
+        result: result
+      };
+    } catch (error) {
+      this.providerStats[bestProvider].failures++;
+      this.providerStats[bestProvider].lastFailure = new Date().toISOString();
+      throw error;
+    }
+  }
+  
+  /**
+   * Reset provider statistics
+   * 
+   * @param {string} providerName - Optional provider name to reset
+   */
+  resetProviderStats(providerName = null) {
+    if (providerName) {
+      if (this.providerStats[providerName]) {
+        this.providerStats[providerName] = {
+          attempts: 0,
+          successes: 0,
+          failures: 0,
+          lastUsed: null,
+          lastSuccess: null,
+          lastFailure: null
+        };
+      }
+    } else {
+      // Reset all providers
+      Object.keys(this.providerStats).forEach(name => {
+        this.resetProviderStats(name);
+      });
+    }
+  }
+}
+
+module.exports = { ProviderManager };
