@@ -917,7 +917,7 @@
         "node -e \"const p = require('./src/prompt'); console.log(p.draftFixPrompt('test-task', 'test-error'));\"",
         "npm test -- prompt"
       ],
-      "status": "todo",
+      "status": "completed",
       "effort": "M",
       "dependencies": [
         "T5.1",

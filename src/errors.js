@@ -133,6 +133,19 @@ class LogSummarizationError extends OrchestratorError {
   }
 }
 
+/**
+ * Fix Prompt Error
+ * 
+ * Thrown when fix prompt drafting operations fail
+ */
+class FixPromptError extends OrchestratorError {
+  constructor(message, cause) {
+    super(message, cause);
+    this.taskId = cause?.taskId;
+    this.template = cause?.template;
+  }
+}
+
 module.exports = {
   OrchestratorError,
   TaskExecutionError,
@@ -143,5 +156,6 @@ module.exports = {
   OllamaClientError,
   OllamaRequestError,
   OllamaResponseError,
-  LogSummarizationError
+  LogSummarizationError,
+  FixPromptError
 };
