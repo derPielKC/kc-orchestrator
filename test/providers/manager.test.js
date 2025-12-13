@@ -549,4 +549,190 @@ describe('ProviderManager', () => {
       });
     });
   });
+
+  describe('AI Provider Selection', () => {
+    let aiManager;
+    
+    beforeAll(() => {
+      aiManager = new ProviderManager({
+        verbose: false,
+        useAIProviderSelection: true
+      });
+    });
+
+    it('should have AI provider selection enabled by default', () => {
+      const defaultManager = new ProviderManager({ verbose: false });
+      expect(defaultManager.useAIProviderSelection).toBe(true);
+    });
+
+    it('should allow disabling AI provider selection', () => {
+      const noAiManager = new ProviderManager({
+        verbose: false,
+        useAIProviderSelection: false
+      });
+      expect(noAiManager.useAIProviderSelection).toBe(false);
+    });
+
+    it('should have checkOllamaAvailability method', () => {
+      expect(typeof aiManager.checkOllamaAvailability).toBe('function');
+    });
+
+    it('should have getAIProviderRecommendation method', () => {
+      expect(typeof aiManager.getAIProviderRecommendation).toBe('function');
+    });
+
+    it('should have getBestProviderWithAI method', () => {
+      expect(typeof aiManager.getBestProviderWithAI).toBe('function');
+    });
+
+    it('should have executeWithAIAssistedProvider method', () => {
+      expect(typeof aiManager.executeWithAIAssistedProvider).toBe('function');
+    });
+
+    it('should handle AI provider selection when Ollama unavailable', async () => {
+      // Mock Ollama availability check to return false
+      const mockCheckAvailability = jest.spyOn(aiManager.ollamaClient, 'checkAvailability');
+      mockCheckAvailability.mockResolvedValue(false);
+      
+      const task = { id: 'T1', title: 'Test Task', description: 'Test description' };
+      const result = await aiManager.getAIProviderRecommendation(task, ['Codex', 'Claude']);
+      
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Ollama not available');
+      
+      mockCheckAvailability.mockRestore();
+    });
+
+    it('should handle AI provider selection when disabled', async () => {
+      const noAiManager = new ProviderManager({
+        verbose: false,
+        useAIProviderSelection: false
+      });
+      
+      const task = { id: 'T1', title: 'Test Task', description: 'Test description' };
+      const result = await noAiManager.getAIProviderRecommendation(task, ['Codex', 'Claude']);
+      
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('AI provider selection is disabled');
+    });
+
+    it('should parse AI provider recommendation correctly', async () => {
+      // Mock the Ollama client to return a realistic recommendation
+      const mockSelectProvider = jest.spyOn(aiManager.ollamaClient, 'selectProvider');
+      mockSelectProvider.mockResolvedValue({
+        response: `Recommended provider: Claude
+Reasoning for the selection:
+Claude is best suited for this natural language task due to its strong conversational capabilities and context understanding.
+Alternative options if the recommended provider fails:
+Codex, Vibe
+Specific configuration recommendations:
+Use temperature 0.3 for more creative responses
+Confidence score: 85%`,
+        model: 'llama3',
+        totalDuration: 1000
+      });
+      
+      const task = { id: 'T1', title: 'Test Task', description: 'Test description' };
+      const result = await aiManager.getAIProviderRecommendation(task, ['Codex', 'Claude', 'Vibe']);
+      
+      expect(result.success).toBe(true);
+      expect(result.recommendedProvider).toBe('Claude');
+      expect(result.reasoning).toContain('Claude is best suited');
+      expect(result.alternatives).toEqual(['Codex', 'Vibe']);
+      expect(result.configuration).toContain('temperature 0.3');
+      expect(result.confidence).toBe(85);
+      expect(result.model).toBe('llama3');
+      
+      mockSelectProvider.mockRestore();
+    });
+
+    it('should cache AI provider recommendations', async () => {
+      // Mock the Ollama client
+      const mockSelectProvider = jest.spyOn(aiManager.ollamaClient, 'selectProvider');
+      mockSelectProvider.mockResolvedValue({
+        response: 'Recommended provider: Codex\nReasoning: Best for code\nConfidence score: 90%',
+        model: 'llama3',
+        totalDuration: 1000
+      });
+      
+      const task = { id: 'T1', title: 'Test Task', description: 'Test description' };
+      const providers = ['Codex', 'Claude'];
+      
+      // First call - should use Ollama
+      const firstResult = await aiManager.getAIProviderRecommendation(task, providers);
+      expect(firstResult.success).toBe(true);
+      expect(mockSelectProvider).toHaveBeenCalledTimes(1);
+      
+      // Second call - should use cache
+      const secondResult = await aiManager.getAIProviderRecommendation(task, providers);
+      expect(secondResult.success).toBe(true);
+      expect(mockSelectProvider).toHaveBeenCalledTimes(1); // Still 1 - cached
+      
+      mockSelectProvider.mockRestore();
+    });
+
+    it('should fall back to traditional selection when AI fails', async () => {
+      // Mock the Ollama client to fail
+      const mockSelectProvider = jest.spyOn(aiManager.ollamaClient, 'selectProvider');
+      mockSelectProvider.mockRejectedValue(new Error('Ollama error'));
+      
+      const task = { id: 'T1', title: 'Test Task', description: 'Test description' };
+      const bestProvider = await aiManager.getBestProviderWithAI(task);
+      
+      // Should return a valid provider (traditional fallback)
+      expect(bestProvider).toBeTruthy();
+      expect(aiManager.getAvailableProviders()).toContain(bestProvider);
+      
+      mockSelectProvider.mockRestore();
+    });
+
+    it('should use AI recommendation when available', async () => {
+      // Mock the Ollama client to return a valid recommendation
+      const mockSelectProvider = jest.spyOn(aiManager.ollamaClient, 'selectProvider');
+      mockSelectProvider.mockResolvedValue({
+        response: 'Recommended provider: Vibe\nReasoning: Best for this task\nConfidence score: 95%',
+        model: 'llama3',
+        totalDuration: 1000
+      });
+      
+      const task = { id: 'T1', title: 'Test Task', description: 'Test description' };
+      const bestProvider = await aiManager.getBestProviderWithAI(task);
+      
+      // Should return the AI-recommended provider
+      expect(bestProvider).toBe('Vibe');
+      
+      mockSelectProvider.mockRestore();
+    });
+
+    it('should handle unavailable AI-recommended provider', async () => {
+      // Mock the Ollama client to recommend an unavailable provider
+      const mockSelectProvider = jest.spyOn(aiManager.ollamaClient, 'selectProvider');
+      mockSelectProvider.mockResolvedValue({
+        response: 'Recommended provider: NonExistent\nReasoning: Best for this task\nConfidence score: 95%',
+        model: 'llama3',
+        totalDuration: 1000
+      });
+      
+      const task = { id: 'T1', title: 'Test Task', description: 'Test description' };
+      const bestProvider = await aiManager.getBestProviderWithAI(task);
+      
+      // Should fall back to traditional selection
+      expect(bestProvider).toBeTruthy();
+      expect(bestProvider).not.toBe('NonExistent');
+      expect(aiManager.getAvailableProviders()).toContain(bestProvider);
+      
+      mockSelectProvider.mockRestore();
+    });
+
+    it('should extract confidence from recommendation text', () => {
+      const confidence1 = aiManager._extractConfidenceFromText('Confidence score: 85%');
+      expect(confidence1).toBe(85);
+      
+      const confidence2 = aiManager._extractConfidenceFromText('Some text Confidence score: 70% more text');
+      expect(confidence2).toBe(70);
+      
+      const confidence3 = aiManager._extractConfidenceFromText('No confidence score here');
+      expect(confidence3).toBe(70); // Default value
+    });
+  });
 });

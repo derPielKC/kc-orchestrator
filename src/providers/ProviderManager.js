@@ -3,6 +3,7 @@ const { CodexProvider } = require('./CodexProvider');
 const { ClaudeProvider } = require('./ClaudeProvider');
 const { VibeProvider } = require('./VibeProvider');
 const { CursorAgentProvider } = require('./CursorAgentProvider');
+const { OllamaClient } = require('../ollama');
 
 /**
  * Provider Manager - Handles provider selection, fallback, and execution
@@ -24,6 +25,10 @@ class ProviderManager {
     this.providerOrder = options.providerOrder || ['Codex', 'Claude', 'Vibe', 'CursorAgent'];
     this.timeout = options.timeout || 120000; // 120 seconds default
     this.verbose = options.verbose || false;
+    this.useAIProviderSelection = options.useAIProviderSelection !== false; // Enable AI selection by default
+    this.aiSelectionCache = new Map(); // Cache for AI recommendations
+    this.aiSelectionCacheTTL = options.aiSelectionCacheTTL || 3600000; // 1 hour cache TTL
+    this.ollamaClient = options.ollamaClient || new OllamaClient();
     this.providerInstances = {};
     this.providerStats = {};
     
@@ -402,6 +407,212 @@ class ProviderManager {
       Object.keys(this.providerStats).forEach(name => {
         this.resetProviderStats(name);
       });
+    }
+  }
+
+  /**
+   * Check if Ollama is available for AI provider selection
+   * 
+   * @returns {Promise<boolean>} True if Ollama is available
+   */
+  async checkOllamaAvailability() {
+    try {
+      return await this.ollamaClient.checkAvailability();
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Get AI-based provider recommendation using Ollama
+   * 
+   * @param {object} task - Task to execute
+   * @param {Array} availableProviders - List of available providers
+   * @returns {Promise<object>} AI recommendation result
+   */
+  async getAIProviderRecommendation(task, availableProviders) {
+    try {
+      // Check if AI selection is enabled
+      if (!this.useAIProviderSelection) {
+        return {
+          success: false,
+          message: 'AI provider selection is disabled'
+        };
+      }
+
+      // Check if Ollama is available
+      const ollamaAvailable = await this.checkOllamaAvailability();
+      
+      if (!ollamaAvailable) {
+        return {
+          success: false,
+          message: 'Ollama not available for AI provider selection'
+        };
+      }
+
+      // Check cache first
+      const cacheKey = JSON.stringify({ taskId: task.id, providers: availableProviders.sort() });
+      const cachedRecommendation = this.aiSelectionCache.get(cacheKey);
+      
+      if (cachedRecommendation && (Date.now() - cachedRecommendation.timestamp < this.aiSelectionCacheTTL)) {
+        if (this.verbose) {
+          console.log(`🤖 Using cached AI provider recommendation for task ${task.id}`);
+        }
+        return cachedRecommendation;
+      }
+
+      // Prepare task description for AI
+      const taskDescription = task.description || task.title || `Task ${task.id}`;
+      const taskContext = task.context ? `\nContext: ${task.context}` : '';
+      const requirements = task.requirements ? `\nRequirements: ${task.requirements.join(', ')}` : '';
+
+      // Use Ollama to select the best provider
+      const selectionResult = await this.ollamaClient.selectProvider({
+        taskDescription: `${taskDescription}${taskContext}${requirements}`,
+        availableProviders,
+        options: {
+          temperature: 0.0 // Deterministic selection
+        }
+      });
+
+      // Parse the AI recommendation
+      const recommendationText = selectionResult.response;
+      
+      // Extract recommended provider (look for pattern like "Recommended provider: Claude")
+      const providerMatch = recommendationText.match(/Recommended\s+provider:\s*(\w+)/i);
+      const recommendedProvider = providerMatch ? providerMatch[1] : null;
+      
+      // Extract reasoning
+      const reasoningMatch = recommendationText.match(/Reasoning[^:]*:\s*([\s\S]*?)(?=\n\n|\nAlternative|\n$)/i);
+      const reasoning = reasoningMatch ? reasoningMatch[1].trim() : 'No reasoning provided';
+      
+      // Extract alternative providers
+      const alternativesMatch = recommendationText.match(/Alternative\s+options[^:]*:\s*([\s\S]*?)(?=\n\n|\nSpecific|\n$)/i);
+      const alternatives = alternativesMatch ? alternativesMatch[1].trim() : '';
+      
+      // Extract specific configuration recommendations
+      const configMatch = recommendationText.match(/Specific\s+configuration[^:]*:\s*([\s\S]*?)(?=\n\n|$)/i);
+      const configuration = configMatch ? configMatch[1].trim() : '';
+
+      // Create recommendation result
+      const recommendation = {
+        success: true,
+        recommendedProvider,
+        reasoning,
+        alternatives: alternatives.split(',').map(a => a.trim()).filter(a => a),
+        configuration,
+        model: selectionResult.model,
+        duration: selectionResult.totalDuration,
+        timestamp: Date.now(),
+        confidence: this._extractConfidenceFromText(recommendationText)
+      };
+
+      // Cache the recommendation
+      this.aiSelectionCache.set(cacheKey, recommendation);
+      
+      if (this.verbose) {
+        console.log(`🤖 AI provider recommendation for task ${task.id}: ${recommendedProvider || 'unknown'}`);
+      }
+
+      return recommendation;
+    } catch (error) {
+      return {
+        success: false,
+        message: `AI provider selection failed: ${error.message}`,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Extract confidence score from AI recommendation text
+   * 
+   * @param {string} text - Recommendation text
+   * @returns {number} Confidence score (0-100)
+   */
+  _extractConfidenceFromText(text) {
+    const confidenceMatch = text.match(/Confidence\s+score:\s*(\d+)%/i);
+    return confidenceMatch ? parseInt(confidenceMatch[1], 10) : 70; // Default to 70% confidence
+  }
+
+  /**
+   * Get best provider with AI assistance
+   * 
+   * @param {object} task - Task to execute
+   * @returns {Promise<string|null>} Best provider name or null
+   */
+  async getBestProviderWithAI(task) {
+    try {
+      const availableProviders = this.getAvailableProviders();
+      
+      if (availableProviders.length === 0) {
+        return null;
+      }
+
+      // Try AI recommendation first
+      if (this.useAIProviderSelection) {
+        const aiRecommendation = await this.getAIProviderRecommendation(task, availableProviders);
+        
+        if (aiRecommendation.success && aiRecommendation.recommendedProvider) {
+          // Check if recommended provider is available
+          if (availableProviders.includes(aiRecommendation.recommendedProvider)) {
+            if (this.verbose) {
+              console.log(`🎯 AI selected provider: ${aiRecommendation.recommendedProvider}`);
+            }
+            return aiRecommendation.recommendedProvider;
+          }
+        }
+      }
+
+      // Fallback to traditional selection if AI fails or provider not available
+      return this.getBestAvailableProvider();
+    } catch (error) {
+      if (this.verbose) {
+        console.log(`⚠️  AI provider selection failed, falling back to traditional method: ${error.message}`);
+      }
+      return this.getBestAvailableProvider();
+    }
+  }
+
+  /**
+   * Execute a task with AI-assisted provider selection
+   * 
+   * @param {object} task - Task to execute
+   * @param {object} context - Execution context
+   * @returns {Promise<object>} Task execution result
+   */
+  async executeWithAIAssistedProvider(task, context = {}) {
+    const bestProvider = await this.getBestProviderWithAI(task);
+    
+    if (!bestProvider) {
+      throw new Error('No available providers');
+    }
+     
+    if (this.verbose) {
+      console.log(`🎯 Selected provider: ${bestProvider}`);
+    }
+     
+    const provider = this.providerInstances[bestProvider];
+    
+    // Update stats
+    this.providerStats[bestProvider].attempts++;
+    this.providerStats[bestProvider].lastUsed = new Date().toISOString();
+    
+    try {
+      const result = await provider.executeTask(task, context);
+      this.providerStats[bestProvider].successes++;
+      this.providerStats[bestProvider].lastSuccess = new Date().toISOString();
+      
+      return {
+        success: true,
+        provider: bestProvider,
+        result: result,
+        aiAssisted: true
+      };
+    } catch (error) {
+      this.providerStats[bestProvider].failures++;
+      this.providerStats[bestProvider].lastFailure = new Date().toISOString();
+      throw error;
     }
   }
 }

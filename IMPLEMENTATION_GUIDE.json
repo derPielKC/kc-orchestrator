@@ -999,7 +999,7 @@
         "node -e \"const s = require('./src/selector'); console.log(s.selectProvider('test-task'));\"",
         "npm test -- selector"
       ],
-      "status": "in_progress",
+      "status": "completed",
       "effort": "L",
       "dependencies": [
         "T5.1",
