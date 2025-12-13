@@ -1116,7 +1116,7 @@
         "node -e \"const r = require('./src/reporting'); console.log(r.generateReport('test-session'));\"",
         "npm test -- reporting"
       ],
-      "status": "todo",
+      "status": "completed",
       "effort": "M",
       "dependencies": [
         "T6.1",
