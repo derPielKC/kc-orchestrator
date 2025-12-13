@@ -1040,7 +1040,7 @@
         "node -e \"const l = require('./src/logger'); l.info('Test message');\"",
         "npm test -- logger"
       ],
-      "status": "todo",
+      "status": "completed",
       "effort": "S",
       "dependencies": [
         "T1.1"
