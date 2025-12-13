@@ -146,6 +146,14 @@ class FixPromptError extends OrchestratorError {
   }
 }
 
+class ReportGenerationError extends OrchestratorError {
+  constructor(message, cause) {
+    super(message, cause);
+    this.reportType = cause?.reportType;
+    this.executionData = cause?.executionData;
+  }
+}
+
 module.exports = {
   OrchestratorError,
   TaskExecutionError,
@@ -157,5 +165,6 @@ module.exports = {
   OllamaRequestError,
   OllamaResponseError,
   LogSummarizationError,
-  FixPromptError
+  FixPromptError,
+  ReportGenerationError
 };

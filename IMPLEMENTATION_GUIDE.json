@@ -1078,7 +1078,7 @@
         "node -e \"const e = require('./src/errors'); console.log(new e.OrchestratorError('test'));\"",
         "npm test -- errors"
       ],
-      "status": "todo",
+      "status": "completed",
       "effort": "M",
       "dependencies": [
         "T6.1"
