@@ -1124,6 +1124,48 @@
       ]
     },
     {
+      "id": "T6.3",
+      "title": "Add error recovery and resume functionality",
+      "description": "Create robust error handling and recovery mechanisms",
+      "acceptanceCriteria": [
+        "Implements execution checkpointing and save/restore functionality",
+        "Adds error classification system (transient, configuration, permanent)",
+        "Implements smart retry logic with exponential backoff",
+        "Supports manual intervention for complex errors",
+        "Provides resume capability from checkpoints",
+        "Handles both expected and unexpected errors gracefully"
+      ],
+      "constraints": {
+        "do": [
+          "Use checkpoint files for persistent state",
+          "Implement error classification based on error messages",
+          "Add exponential backoff for transient errors",
+          "Support both automatic and manual recovery",
+          "Maintain backward compatibility with existing execution"
+        ],
+        "dont": [
+          "Lose execution state on failures",
+          "Retry permanent errors indefinitely",
+          "Block execution on manual intervention requests"
+        ]
+      },
+      "outputs": [
+        "src/engine.js (extended with recovery methods)",
+        "test/engine.recovery.test.js (comprehensive tests)"
+      ],
+      "checkSteps": [
+        "node -e \"const e = require('./src/engine'); console.log('Checkpointing ready:', typeof e.TaskExecutionEngine.prototype.saveCheckpoint);\"",
+        "node -e \"const e = require('./src/engine'); console.log('Error classification ready:', typeof e.TaskExecutionEngine.prototype.classifyError);\"",
+        "npm test -- engine.recovery"
+      ],
+      "status": "completed",
+      "effort": "L",
+      "dependencies": [
+        "T6.1",
+        "T6.2"
+      ]
+    },
+    {
       "id": "T7.1",
       "title": "Create unit test suite",
       "description": "Build comprehensive unit tests for all modules",

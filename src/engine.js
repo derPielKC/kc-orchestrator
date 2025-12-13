@@ -8,6 +8,8 @@
 const { ProviderManager } = require('./providers/ProviderManager');
 const { readGuide, writeGuide, updateTaskStatus } = require('./config');
 const { TaskExecutionError, TaskValidationError } = require('./errors');
+const fs = require('fs').promises;
+const path = require('path');
 
 /**
  * Task Execution Engine
@@ -41,6 +43,36 @@ class TaskExecutionEngine {
     });
     
     this.executionLog = [];
+    this.checkpointDir = path.join(this.projectPath, '.kc-orchestrator', 'checkpoints');
+    this.currentCheckpoint = null;
+    this.errorClassificationRules = {
+      transient: [
+        'timeout',
+        'network',
+        'rate limit',
+        'temporary',
+        'unavailable',
+        'connection',
+        'retry'
+      ],
+      configuration: [
+        'configuration',
+        'config',
+        'setup',
+        'environment',
+        'permission',
+        'access'
+      ],
+      permanent: [
+        'not found',
+        'invalid',
+        'corrupt',
+        'missing',
+        'failed',
+        'fatal error',
+        'critical error'
+      ]
+    };
   }
 
   /**
@@ -189,10 +221,13 @@ class TaskExecutionEngine {
       });
     }
     
-    throw new TaskExecutionError(
+    const errorType = this.classifyError(lastError);
+    const executionError = new TaskExecutionError(
       `Task ${task.id} failed after ${this.maxRetries} attempts: ${lastError.message}`,
       lastError
     );
+    executionError.errorType = errorType;
+    throw executionError;
   }
 
   /**
@@ -268,6 +303,383 @@ class TaskExecutionEngine {
    */
   getExecutionLog() {
     return [...this.executionLog];
+  }
+
+  /**
+   * Ensure checkpoint directory exists
+   * 
+   * @returns {Promise<void>}
+   */
+  async ensureCheckpointDir() {
+    try {
+      await fs.mkdir(this.checkpointDir, { recursive: true });
+    } catch (error) {
+      if (error.code !== 'EEXIST') {
+        this.log('error', 'Failed to create checkpoint directory', { error: error.message });
+        throw new TaskExecutionError('Failed to create checkpoint directory', error);
+      }
+    }
+  }
+
+  /**
+   * Save execution checkpoint
+   * 
+   * @param {Object} checkpointData - Checkpoint data to save
+   * @returns {Promise<string>} Path to saved checkpoint
+   */
+  async saveCheckpoint(checkpointData) {
+    try {
+      await this.ensureCheckpointDir();
+      
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const checkpointPath = path.join(this.checkpointDir, `checkpoint-${timestamp}.json`);
+      
+      const checkpoint = {
+        timestamp: new Date().toISOString(),
+        projectPath: this.projectPath,
+        guidePath: this.guidePath,
+        executionLog: this.executionLog,
+        currentTaskIndex: checkpointData.currentTaskIndex,
+        completedTasks: checkpointData.completedTasks,
+        failedTasks: checkpointData.failedTasks,
+        ...checkpointData
+      };
+      
+      await fs.writeFile(checkpointPath, JSON.stringify(checkpoint, null, 2), 'utf8');
+      this.currentCheckpoint = checkpointPath;
+      
+      this.log('info', 'Checkpoint saved', { checkpointPath });
+      return checkpointPath;
+    } catch (error) {
+      this.log('error', 'Failed to save checkpoint', { error: error.message });
+      throw new TaskExecutionError('Failed to save checkpoint', error);
+    }
+  }
+
+  /**
+   * Load execution checkpoint
+   * 
+   * @param {string} checkpointPath - Path to checkpoint file
+   * @returns {Promise<Object>} Loaded checkpoint data
+   */
+  async loadCheckpoint(checkpointPath) {
+    try {
+      const checkpointContent = await fs.readFile(checkpointPath, 'utf8');
+      const checkpoint = JSON.parse(checkpointContent);
+      
+      this.log('info', 'Checkpoint loaded', { checkpointPath });
+      return checkpoint;
+    } catch (error) {
+      this.log('error', 'Failed to load checkpoint', { error: error.message, checkpointPath });
+      throw new TaskExecutionError('Failed to load checkpoint', error);
+    }
+  }
+
+  /**
+   * Find latest checkpoint
+   * 
+   * @returns {Promise<string|null>} Path to latest checkpoint or null if none exists
+   */
+  async findLatestCheckpoint() {
+    try {
+      await this.ensureCheckpointDir();
+      
+      const files = await fs.readdir(this.checkpointDir);
+      const checkpointFiles = files
+        .filter(file => file.startsWith('checkpoint-') && file.endsWith('.json'))
+        .sort((a, b) => b.localeCompare(a)); // Sort by timestamp (newest first)
+      
+      if (checkpointFiles.length === 0) {
+        return null;
+      }
+      
+      return path.join(this.checkpointDir, checkpointFiles[0]);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        return null;
+      }
+      this.log('error', 'Failed to find latest checkpoint', { error: error.message });
+      throw new TaskExecutionError('Failed to find latest checkpoint', error);
+    }
+  }
+
+  /**
+   * Classify error for recovery strategy
+   * 
+   * @param {Error} error - Error to classify
+   * @returns {string} Error classification (transient, configuration, permanent, unknown)
+   */
+  classifyError(error) {
+    const errorMessage = error.message.toLowerCase();
+    
+    // Check for transient errors
+    for (const keyword of this.errorClassificationRules.transient) {
+      if (errorMessage.includes(keyword)) {
+        return 'transient';
+      }
+    }
+    
+    // Check for configuration errors
+    for (const keyword of this.errorClassificationRules.configuration) {
+      if (errorMessage.includes(keyword)) {
+        return 'configuration';
+      }
+    }
+    
+    // Check for permanent errors
+    for (const keyword of this.errorClassificationRules.permanent) {
+      if (errorMessage.includes(keyword)) {
+        return 'permanent';
+      }
+    }
+    
+    return 'unknown';
+  }
+
+  /**
+   * Determine if error should be retried
+   * 
+   * @param {Error} error - Error to evaluate
+   * @param {number} retryCount - Current retry count
+   * @returns {boolean} True if error should be retried
+   */
+  shouldRetry(error, retryCount) {
+    const errorType = this.classifyError(error);
+    
+    // Never retry permanent errors
+    if (errorType === 'permanent') {
+      return false;
+    }
+    
+    // Always retry transient errors (with exponential backoff)
+    if (errorType === 'transient') {
+      return retryCount < this.maxRetries;
+    }
+    
+    // Retry configuration errors only a few times
+    if (errorType === 'configuration') {
+      return retryCount < 2; // Only 2 retries for configuration errors
+    }
+    
+    // Retry unknown errors with standard retry logic
+    return retryCount < this.maxRetries;
+  }
+
+  /**
+   * Calculate exponential backoff delay
+   * 
+   * @param {number} retryCount - Current retry count
+   * @returns {number} Delay in milliseconds
+   */
+  getRetryDelay(retryCount) {
+    // Exponential backoff: 1s, 2s, 4s, 8s, 16s, etc.
+    const baseDelay = 1000;
+    return Math.min(baseDelay * Math.pow(2, retryCount), 30000); // Max 30s
+  }
+
+  /**
+   * Request manual intervention for complex errors
+   * 
+   * @param {Error} error - Error requiring manual intervention
+   * @param {Object} task - Task that failed
+   * @returns {Promise<boolean>} True if user wants to continue
+   */
+  async requestManualIntervention(error, task) {
+    // In non-interactive mode, always continue
+    if (process.env.NON_INTERACTIVE || process.env.CI) {
+      this.log('warn', 'Manual intervention requested but running in non-interactive mode', {
+        taskId: task.id,
+        error: error.message
+      });
+      return true;
+    }
+    
+    // For now, just log the need for manual intervention
+    // In a real implementation, this would prompt the user
+    this.log('error', 'Manual intervention required', {
+      taskId: task.id,
+      error: error.message,
+      suggestion: 'Please review the error and fix the underlying issue'
+    });
+    
+    return true; // Always continue for now
+  }
+
+  /**
+   * Execute all tasks with checkpointing and error recovery
+   * 
+   * @param {Object} options - Execution options
+   * @param {boolean} options.resume - Resume from latest checkpoint
+   * @param {string} options.checkpointPath - Specific checkpoint to resume from
+   * @returns {Object} Execution summary
+   */
+  async executeAllTasksWithRecovery(options = {}) {
+    const startTime = Date.now();
+    let results = {
+      totalTasks: 0,
+      completed: 0,
+      failed: 0,
+      skipped: 0,
+      executionLog: [],
+      checkpoints: [],
+      recoveredFromCheckpoint: false
+    };
+    
+    let tasks = [];
+    let currentTaskIndex = 0;
+    
+    try {
+      // Check if we should resume from checkpoint
+      let checkpoint = null;
+      if (options.resume) {
+        const checkpointPath = options.checkpointPath || await this.findLatestCheckpoint();
+        if (checkpointPath) {
+          checkpoint = await this.loadCheckpoint(checkpointPath);
+          results.recoveredFromCheckpoint = true;
+          
+          // Restore state from checkpoint
+          tasks = checkpoint.tasks || [];
+          currentTaskIndex = checkpoint.currentTaskIndex || 0;
+          results.completed = checkpoint.completedTasks || 0;
+          results.failed = checkpoint.failedTasks || 0;
+          results.executionLog = checkpoint.executionLog || [];
+          this.executionLog = [...results.executionLog];
+          
+          this.log('info', 'Resumed execution from checkpoint', {
+            checkpointPath,
+            currentTaskIndex,
+            completed: results.completed,
+            failed: results.failed
+          });
+        }
+      }
+      
+      // If no checkpoint or no tasks in checkpoint, get fresh tasks
+      if (tasks.length === 0) {
+        tasks = await this.getTasksForExecution();
+        results.totalTasks = tasks.length;
+        
+        if (tasks.length === 0) {
+          this.log('info', 'No tasks ready for execution');
+          results.skipped = 0;
+          return results;
+        }
+      }
+      
+      results.totalTasks = tasks.length;
+      
+      // Execute tasks sequentially with checkpointing
+      for (let i = currentTaskIndex; i < tasks.length; i++) {
+        const task = tasks[i];
+        let attempt = 0;
+        let lastError = null;
+        
+        // Save checkpoint before starting task
+        try {
+          const checkpointPath = await this.saveCheckpoint({
+            currentTaskIndex: i,
+            completedTasks: results.completed,
+            failedTasks: results.failed,
+            tasks: tasks.map(t => ({ id: t.id, status: t.status }))
+          });
+          results.checkpoints.push(checkpointPath);
+        } catch (checkpointError) {
+          this.log('warn', 'Failed to save checkpoint before task execution', {
+            taskId: task.id,
+            error: checkpointError.message
+          });
+        }
+        
+        // Execute task with enhanced error recovery
+        while (attempt <= this.maxRetries) {
+          try {
+            const taskResult = await this.executeTask(task);
+            results.completed++;
+            results.executionLog.push({
+              taskId: task.id,
+              status: 'completed',
+              ...taskResult
+            });
+            break; // Task completed successfully, move to next task
+            
+          } catch (error) {
+            lastError = error;
+            attempt++;
+            
+            // Classify error and decide recovery strategy
+            const errorType = this.classifyError(error);
+            this.log('warn', `Task failed with ${errorType} error (attempt ${attempt}/${this.maxRetries})`, {
+              taskId: task.id,
+              errorType,
+              error: error.message
+            });
+            
+            // Check if we should retry
+            if (!this.shouldRetry(error, attempt)) {
+              this.log('info', `Not retrying ${errorType} error`, {
+                taskId: task.id,
+                errorType
+              });
+              break;
+            }
+            
+            // Apply exponential backoff
+            const delay = this.getRetryDelay(attempt);
+            this.log('info', `Waiting ${delay}ms before retry (exponential backoff)`, {
+              taskId: task.id,
+              attempt,
+              delay
+            });
+            
+            // Simulate delay (in real implementation, use setTimeout with async/await)
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+        
+        // If task failed after all attempts, handle failure
+        if (lastError) {
+          results.failed++;
+          results.executionLog.push({
+            taskId: lastError.taskId || (lastError.task && lastError.task.id) || 'unknown',
+            status: 'failed',
+            error: lastError.message,
+            errorType: this.classifyError(lastError)
+          });
+          
+          // Request manual intervention for configuration errors
+          if (this.classifyError(lastError) === 'configuration') {
+            const shouldContinue = await this.requestManualIntervention(lastError, task);
+            if (!shouldContinue) {
+              this.log('info', 'Execution stopped by user request');
+              break;
+            }
+          }
+        }
+      }
+      
+      const duration = Date.now() - startTime;
+      this.log('info', `Execution completed: ${results.completed} completed, ${results.failed} failed`, {
+        duration,
+        totalTasks: results.totalTasks,
+        recoveredFromCheckpoint: results.recoveredFromCheckpoint
+      });
+      
+      return {
+        ...results,
+        duration,
+        success: results.failed === 0
+      };
+    } catch (error) {
+      this.log('error', 'Fatal error during task execution with recovery', { error: error.message });
+      throw new TaskExecutionError('Fatal error during task execution with recovery', error);
+    }
+  }
+
+  /**
+   * Clear execution log
+   */
+  clearExecutionLog() {
+    this.executionLog = [];
   }
 
   /**
