@@ -322,9 +322,9 @@ describe('TaskValidator', () => {
       
 
       expect(result.taskId).toBe('T1');
-      expect(result.validations).toHaveLength(4); // 4 validation types
+      expect(result.validations).toHaveLength(5); // 5 validation types (4 original + AI judging)
       expect(result.overallPassed).toBe(false); // Custom script validation fails (no script specified)
-      expect(result.summary).toContain('1 of 4 validation checks failed');
+      expect(result.summary).toContain('validation checks failed');
     });
 
     test('should handle validation failures gracefully', async () => {
@@ -336,7 +336,7 @@ describe('TaskValidator', () => {
       const result = await validator.validateTask(task, executionResult);
       
       expect(result.taskId).toBe('T1');
-      expect(result.validations).toHaveLength(4);
+      expect(result.validations).toHaveLength(5); // 5 validation types (4 original + AI judging)
       expect(result.overallPassed).toBe(false);
       expect(result.summary).toContain('validation checks failed');
     });
@@ -440,6 +440,202 @@ describe('TaskValidator', () => {
       const report = await validator.generateValidationReport();
       expect(report.totalTasks).toBe(0);
       expect(report.validationSummary).toContain('No tasks found in guide');
+    });
+  });
+
+  describe('AI Judging', () => {
+    let aiValidator;
+    
+    beforeAll(() => {
+      aiValidator = new TaskValidator({
+        projectPath: testProjectPath,
+        guidePath: testGuidePath,
+        useAIJudging: true
+      });
+    });
+
+    test('should have AI judging enabled by default', () => {
+      const defaultValidator = new TaskValidator({
+        projectPath: testProjectPath,
+        guidePath: testGuidePath
+      });
+      
+      expect(defaultValidator.useAIJudging).toBe(true);
+    });
+
+    test('should allow disabling AI judging', () => {
+      const noAiValidator = new TaskValidator({
+        projectPath: testProjectPath,
+        guidePath: testGuidePath,
+        useAIJudging: false
+      });
+      
+      expect(noAiValidator.useAIJudging).toBe(false);
+    });
+
+    test('should have default confidence threshold', () => {
+      expect(aiValidator.aiJudgingConfidenceThreshold).toBe(70);
+    });
+
+    test('should allow custom confidence threshold', () => {
+      const customValidator = new TaskValidator({
+        projectPath: testProjectPath,
+        guidePath: testGuidePath,
+        aiJudgingConfidenceThreshold: 85
+      });
+      
+      expect(customValidator.aiJudgingConfidenceThreshold).toBe(85);
+    });
+
+    test('should have checkOllamaAvailability method', () => {
+      expect(typeof aiValidator.checkOllamaAvailability).toBe('function');
+    });
+
+    test('should have validateWithAIJudging method', () => {
+      expect(typeof aiValidator.validateWithAIJudging).toBe('function');
+    });
+
+    test('should handle AI judging when Ollama unavailable', async () => {
+      // Mock Ollama availability check to return false
+      const mockCheckAvailability = jest.spyOn(aiValidator.ollamaClient, 'checkAvailability');
+      mockCheckAvailability.mockResolvedValue(false);
+      
+      const task = mockGuide.tasks.find(t => t.id === 'T1');
+      const result = await aiValidator.validateWithAIJudging(task, { output: 'test output' });
+      
+      expect(result.validationType).toBe('ai_judging');
+      expect(result.passed).toBe(false);
+      expect(result.message).toContain('Ollama not available');
+      
+      mockCheckAvailability.mockRestore();
+    });
+
+    test('should handle AI judging when disabled', async () => {
+      const noAiValidator = new TaskValidator({
+        projectPath: testProjectPath,
+        guidePath: testGuidePath,
+        useAIJudging: false
+      });
+      
+      const task = mockGuide.tasks.find(t => t.id === 'T1');
+      const result = await noAiValidator.validateWithAIJudging(task, { output: 'test output' });
+      
+      expect(result.validationType).toBe('ai_judging');
+      expect(result.passed).toBe(false);
+      expect(result.message).toContain('AI judging is disabled');
+    });
+
+    test('should include AI judging in comprehensive validation', async () => {
+      const task = mockGuide.tasks.find(t => t.id === 'T1');
+      
+      // Mock the AI judging method to return a predictable result
+      const mockValidateWithAIJudging = jest.spyOn(aiValidator, 'validateWithAIJudging');
+      mockValidateWithAIJudging.mockResolvedValue({
+        taskId: task.id,
+        validationType: 'ai_judging',
+        passed: true,
+        confidenceScore: 85,
+        message: 'AI judgment: PASS (85% confidence)',
+        aiJudgment: {
+          assessment: 'PASS',
+          confidenceScore: 85,
+          judgmentText: 'Overall assessment: PASS\nConfidence score: 85%',
+          model: 'test-model'
+        }
+      });
+      
+      const comprehensiveResult = await aiValidator.validateTask(task, { output: 'test output' });
+      
+      expect(comprehensiveResult.validations).toHaveLength(5); // 4 original + 1 AI judging
+      expect(comprehensiveResult.validations.some(v => v.validationType === 'ai_judging')).toBe(true);
+      
+      mockValidateWithAIJudging.mockRestore();
+    });
+
+    test('should handle AI judgment parsing', async () => {
+      // Mock the Ollama client to return a realistic judgment
+      const mockJudgeOutcome = jest.spyOn(aiValidator.ollamaClient, 'judgeOutcome');
+      mockJudgeOutcome.mockResolvedValue({
+        response: `Overall assessment: PASS
+Confidence score: 85%
+Detailed evaluation against each acceptance criterion:
+- Criterion 1: Met
+- Criterion 2: Met
+Confidence score: 85%
+Recommendations for improvement if needed: None`,
+        model: 'llama3',
+        totalDuration: 1000
+      });
+      
+      const task = mockGuide.tasks.find(t => t.id === 'T1');
+      const result = await aiValidator.validateWithAIJudging(task, { output: 'test output' });
+      
+      expect(result.validationType).toBe('ai_judging');
+      expect(result.passed).toBe(true); // Should pass with 85% confidence (above 70% threshold)
+      expect(result.confidenceScore).toBe(85);
+      expect(result.aiJudgment).toBeDefined();
+      expect(result.aiJudgment.assessment).toBe('PASS');
+      expect(result.aiJudgment.confidenceScore).toBe(85);
+      expect(result.message).toContain('AI judgment: PASS (85% confidence)');
+      
+      mockJudgeOutcome.mockRestore();
+    });
+
+    test('should fail AI judgment below confidence threshold', async () => {
+      // Mock the Ollama client to return low confidence judgment
+      const mockJudgeOutcome = jest.spyOn(aiValidator.ollamaClient, 'judgeOutcome');
+      mockJudgeOutcome.mockResolvedValue({
+        response: `Overall assessment: PASS
+Confidence score: 65%
+Detailed evaluation against each acceptance criterion:
+- Criterion 1: Met
+- Criterion 2: Partially met
+Confidence score: 65%
+Recommendations:
+Improve criterion 2`,
+        model: 'llama3',
+        totalDuration: 1000
+      });
+      
+      const task = mockGuide.tasks.find(t => t.id === 'T1');
+      const result = await aiValidator.validateWithAIJudging(task, { output: 'test output' });
+      
+      expect(result.validationType).toBe('ai_judging');
+      expect(result.passed).toBe(false); // Should fail with 65% confidence (below 70% threshold)
+      expect(result.confidenceScore).toBe(65);
+      expect(result.message).toContain('Below threshold of 70%');
+      expect(result.recommendations).toContain('Improve criterion 2');
+      
+      mockJudgeOutcome.mockRestore();
+    });
+
+    test('should handle FAIL assessment from AI', async () => {
+      // Mock the Ollama client to return FAIL judgment
+      const mockJudgeOutcome = jest.spyOn(aiValidator.ollamaClient, 'judgeOutcome');
+      mockJudgeOutcome.mockResolvedValue({
+        response: `Overall assessment: FAIL
+Confidence score: 90%
+Detailed evaluation against each acceptance criterion:
+- Criterion 1: Not met
+- Criterion 2: Not met
+Confidence score: 90%
+Recommendations:
+Fix both criteria`,
+        model: 'llama3',
+        totalDuration: 1000
+      });
+      
+      const task = mockGuide.tasks.find(t => t.id === 'T1');
+      const result = await aiValidator.validateWithAIJudging(task, { output: 'test output' });
+      
+      expect(result.validationType).toBe('ai_judging');
+      expect(result.passed).toBe(false); // Should fail with FAIL assessment
+      expect(result.confidenceScore).toBe(90);
+      expect(result.aiJudgment.assessment).toBe('FAIL');
+      expect(result.message).toContain('AI judgment: FAIL (90% confidence)');
+      expect(result.recommendations).toContain('Fix both criteria');
+      
+      mockJudgeOutcome.mockRestore();
     });
   });
 });

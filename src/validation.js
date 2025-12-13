@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { readGuide } = require('./config');
+const { OllamaClient } = require('./ollama');
 const { TaskValidationError } = require('./errors');
 
 /**
@@ -29,6 +30,9 @@ class TaskValidator {
     this.projectPath = options.projectPath || process.cwd();
     this.guidePath = options.guidePath || `${this.projectPath}/IMPLEMENTATION_GUIDE.json`;
     this.validationTimeout = options.validationTimeout || 30000; // 30 seconds
+    this.useAIJudging = options.useAIJudging !== false; // Enable AI judging by default
+    this.aiJudgingConfidenceThreshold = options.aiJudgingConfidenceThreshold || 70; // 70% confidence threshold
+    this.ollamaClient = options.ollamaClient || new OllamaClient();
     this.validationResults = new Map(); // taskId -> validationResult
   }
 
@@ -374,7 +378,8 @@ class TaskValidator {
         { type: 'output_files', method: this.validateOutputFiles.bind(this) },
         { type: 'acceptance_criteria', method: this.validateAcceptanceCriteria.bind(this) },
         { type: 'check_steps', method: this.executeCheckSteps.bind(this) },
-        { type: 'custom_script', method: this.executeCustomValidationScript.bind(this) }
+        { type: 'custom_script', method: this.executeCustomValidationScript.bind(this) },
+        { type: 'ai_judging', method: this.validateWithAIJudging.bind(this) }
       ];
 
       for (const validationType of validationTypes) {
@@ -513,6 +518,119 @@ class TaskValidator {
       return report;
     } catch (error) {
       throw new TaskValidationError('Failed to generate validation report', error);
+    }
+  }
+
+  /**
+   * Check if Ollama is available for AI judging
+   * 
+   * @returns {Promise<boolean>} True if Ollama is available
+   */
+  async checkOllamaAvailability() {
+    try {
+      return await this.ollamaClient.checkAvailability();
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Validate task using AI-assisted outcome judging with Ollama
+   * 
+   * @param {Object} task - Task to validate
+   * @param {Object} executionResult - Execution result
+   * @returns {Promise<Object>} AI validation result
+   */
+  async validateWithAIJudging(task, executionResult) {
+    try {
+      const validationResult = {
+        taskId: task.id,
+        validationType: 'ai_judging',
+        timestamp: new Date().toISOString(),
+        aiJudgment: null,
+        confidenceScore: 0,
+        passed: false,
+        message: 'AI judging not performed'
+      };
+
+      // Check if AI judging is enabled
+      if (!this.useAIJudging) {
+        validationResult.message = 'AI judging is disabled in configuration';
+        this.validationResults.set(task.id, validationResult);
+        return validationResult;
+      }
+
+      // Check if Ollama is available
+      const ollamaAvailable = await this.checkOllamaAvailability();
+      
+      if (!ollamaAvailable) {
+        validationResult.message = 'Ollama not available for AI judging';
+        this.validationResults.set(task.id, validationResult);
+        return validationResult;
+      }
+
+      // Prepare judgment parameters
+      const taskDescription = task.description || task.title || `Task ${task.id}`;
+      const acceptanceCriteria = task.acceptanceCriteria ? task.acceptanceCriteria.join('\n') : 'No specific acceptance criteria';
+      const executionOutput = executionResult && executionResult.output 
+        ? (typeof executionResult.output === 'string' 
+            ? executionResult.output 
+            : JSON.stringify(executionResult.output, null, 2))
+        : 'No execution output available';
+
+      // Use Ollama to judge the outcome
+      const judgmentResult = await this.ollamaClient.judgeOutcome({
+        taskDescription,
+        executionResult: executionOutput,
+        acceptanceCriteria,
+        options: {
+          temperature: 0.0 // Deterministic judgment
+        }
+      });
+
+      // Parse the AI judgment
+      const judgmentText = judgmentResult.response;
+      
+      // Extract confidence score (look for pattern like "Confidence score: 85%")
+      const confidenceMatch = judgmentText.match(/Confidence\s+score:\s*(\d+)%/i);
+      const confidenceScore = confidenceMatch ? parseInt(confidenceMatch[1], 10) : 50;
+      
+      // Extract overall assessment (PASS/FAIL)
+      const assessmentMatch = judgmentText.match(/Overall\s+assessment:\s*(PASS|FAIL)/i);
+      const overallAssessment = assessmentMatch ? assessmentMatch[1] : 'UNKNOWN';
+      
+      // Determine if validation passed based on confidence threshold
+      const passed = overallAssessment === 'PASS' && confidenceScore >= this.aiJudgingConfidenceThreshold;
+      
+      // Store comprehensive AI judgment
+      validationResult.aiJudgment = {
+        assessment: overallAssessment,
+        confidenceScore,
+        judgmentText,
+        model: judgmentResult.model,
+        duration: judgmentResult.totalDuration
+      };
+      
+      validationResult.confidenceScore = confidenceScore;
+      validationResult.passed = passed;
+      validationResult.message = `AI judgment: ${overallAssessment} (${confidenceScore}% confidence)`;
+      
+      if (!passed) {
+        if (confidenceScore < this.aiJudgingConfidenceThreshold) {
+          validationResult.message += ` - Below threshold of ${this.aiJudgingConfidenceThreshold}%`;
+        }
+        
+        // Extract recommendations if available
+        const recommendationsMatch = judgmentText.match(/Recommendations:\s*([\s\S]*?)(?=\n\n|$)/i);
+        if (recommendationsMatch && recommendationsMatch[1]) {
+          validationResult.recommendations = recommendationsMatch[1].trim();
+        }
+      }
+
+      this.validationResults.set(task.id, validationResult);
+      return validationResult;
+    } catch (error) {
+      throw new TaskValidationError(`Failed to perform AI judging for task ${task.id}: ${error.message}`, error);
     }
   }
 

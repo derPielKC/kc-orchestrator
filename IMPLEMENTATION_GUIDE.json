@@ -957,7 +957,7 @@
         "node -e \"const j = require('./src/judge'); console.log(j.judgeOutcome('test-task'));\"",
         "npm test -- judge"
       ],
-      "status": "in_progress",
+      "status": "completed",
       "effort": "L",
       "dependencies": [
         "T5.1",
