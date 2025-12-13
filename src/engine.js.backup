@@ -69,10 +69,35 @@ class TaskExecutionEngine {
         'corrupt',
         'missing',
         'failed',
-        'fatal error',
-        'critical error'
+        'error'
       ]
-    };
+      }
+}
+
+module.exports = {
+  TaskExecutionEngine,
+  TaskExecutionError,
+  TaskValidationError
+};
+=======
+
+module.exports = {
+  TaskExecutionEngine,
+  TaskExecutionError,
+  TaskValidationError
+};
+=======
+module.exports = {
+  TaskExecutionEngine,
+  TaskExecutionError,
+  TaskValidationError
+};
+=======
+module.exports = {
+  TaskExecutionEngine,
+  TaskExecutionError,
+  TaskValidationError
+};
   }
 
   /**
@@ -221,13 +246,10 @@ class TaskExecutionEngine {
       });
     }
     
-    const errorType = this.classifyError(lastError);
-    const executionError = new TaskExecutionError(
+    throw new TaskExecutionError(
       `Task ${task.id} failed after ${this.maxRetries} attempts: ${lastError.message}`,
       lastError
     );
-    executionError.errorType = errorType;
-    throw executionError;
   }
 
   /**
@@ -306,6 +328,13 @@ class TaskExecutionEngine {
   }
 
   /**
+   * Clear execution log
+   */
+  clearExecutionLog() {
+    this.executionLog = [];
+  }
+
+  /**
    * Ensure checkpoint directory exists
    * 
    * @returns {Promise<void>}
@@ -342,6 +371,7 @@ class TaskExecutionEngine {
         currentTaskIndex: checkpointData.currentTaskIndex,
         completedTasks: checkpointData.completedTasks,
         failedTasks: checkpointData.failedTasks,
+        providerStatistics: this.providerManager.getStatistics(),
         ...checkpointData
       };
       
@@ -453,7 +483,7 @@ class TaskExecutionEngine {
     
     // Always retry transient errors (with exponential backoff)
     if (errorType === 'transient') {
-      return retryCount <= this.maxRetries; // Allow one more try than maxRetries
+      return retryCount < this.maxRetries;
     }
     
     // Retry configuration errors only a few times
@@ -462,7 +492,7 @@ class TaskExecutionEngine {
     }
     
     // Retry unknown errors with standard retry logic
-    return retryCount <= this.maxRetries; // Allow one more try than maxRetries
+    return retryCount < this.maxRetries;
   }
 
   /**
@@ -673,22 +703,38 @@ class TaskExecutionEngine {
       this.log('error', 'Fatal error during task execution with recovery', { error: error.message });
       throw new TaskExecutionError('Fatal error during task execution with recovery', error);
     }
-  }
 
-  /**
-   * Clear execution log
-   */
-  clearExecutionLog() {
-    this.executionLog = [];
-  }
-
-  /**
-   * Clear execution log
-   */
-  clearExecutionLog() {
-    this.executionLog = [];
   }
 }
+
+module.exports = {
+  TaskExecutionEngine,
+  TaskExecutionError,
+  TaskValidationError
+};
+=======
+
+module.exports = {
+  TaskExecutionEngine,
+  TaskExecutionError,
+  TaskValidationError
+};
+=======
+module.exports = {
+  TaskExecutionEngine,
+  TaskExecutionError,
+  TaskValidationError
+};
+=======
+  }
+}
+
+module.exports = {
+  TaskExecutionEngine,
+  TaskExecutionError,
+  TaskValidationError
+};
+=======
 
 module.exports = {
   TaskExecutionEngine,

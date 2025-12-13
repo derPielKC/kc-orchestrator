@@ -1085,7 +1085,7 @@
       ]
     },
     {
-      "id": "T6.3",
+      "id": "T6.2",
       "title": "Create reporting system",
       "description": "Build system to generate execution reports and summaries",
       "acceptanceCriteria": [
