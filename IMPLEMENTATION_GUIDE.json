@@ -957,7 +957,7 @@
         "node -e \"const j = require('./src/judge'); console.log(j.judgeOutcome('test-task'));\"",
         "npm test -- judge"
       ],
-      "status": "todo",
+      "status": "in_progress",
       "effort": "L",
       "dependencies": [
         "T5.1",
@@ -999,7 +999,7 @@
         "node -e \"const s = require('./src/selector'); console.log(s.selectProvider('test-task'));\"",
         "npm test -- selector"
       ],
-      "status": "todo",
+      "status": "in_progress",
       "effort": "L",
       "dependencies": [
         "T5.1",
