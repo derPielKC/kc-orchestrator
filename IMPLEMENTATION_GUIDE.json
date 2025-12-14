@@ -309,11 +309,12 @@
       "description": "Create init command to initialize kc-orchestrator in project directories",
       "acceptanceCriteria": [
         "Creates .kc-orchestrator directory structure",
-        "Generates IMPLEMENTATION_GUIDE.json with initial structure",
-        "Creates NEXTSESSION_PROMPT.md template",
+        "Generates IMPLEMENTATION_GUIDE.json with initial structure (only if it doesn't exist)",
+        "Creates NEXTSESSION_PROMPT.md template (only if it doesn't exist)",
         "Sets up .gitignore with appropriate entries",
         "Supports --force, --minimal, and --verbose options",
         "Prevents re-initialization without --force flag",
+        "Preserves existing IMPLEMENTATION_GUIDE.json and NEXTSESSION_PROMPT.md files",
         "Provides clear error messages and help text"
       ],
       "constraints": {

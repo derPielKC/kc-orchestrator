@@ -69,49 +69,56 @@ function initCommand(program) {
           }
         });
         
-        // Step 2: Create IMPLEMENTATION_GUIDE.json
-        if (verbose) {
-          console.log('📋 Creating IMPLEMENTATION_GUIDE.json...');
-        }
-        
-        const implementationGuide = {
-          "version": "1.0",
-          "project": "kc-orchestrator",
-          "phases": [
-            {
-              "name": "Initialization",
-              "description": "Setup and configuration of kc-orchestrator",
-              "tasks": [
-                {
-                  "id": "T1",
-                  "title": "Initialize kc-orchestrator",
-                  "description": "Run kc-orchestrator init to set up the project",
-                  "status": "completed",
-                  "effort": "low",
-                  "metadata": {
-                    "category": "setup",
-                    "priority": "high",
-                    "dependencies": []
+        // Step 2: Create IMPLEMENTATION_GUIDE.json (only if it doesn't exist)
+        if (!fs.existsSync(guideFile)) {
+          if (verbose) {
+            console.log('📋 Creating IMPLEMENTATION_GUIDE.json...');
+          }
+          
+          const implementationGuide = {
+            "version": "1.0",
+            "project": "kc-orchestrator",
+            "phases": [
+              {
+                "name": "Initialization",
+                "description": "Setup and configuration of kc-orchestrator",
+                "tasks": [
+                  {
+                    "id": "T1",
+                    "title": "Initialize kc-orchestrator",
+                    "description": "Run kc-orchestrator init to set up the project",
+                    "status": "completed",
+                    "effort": "low",
+                    "metadata": {
+                      "category": "setup",
+                      "priority": "high",
+                      "dependencies": []
+                    }
                   }
-                }
-              ]
-            }
-          ],
-          "completed": true,
-          "timestamp": new Date().toISOString()
-        };
-        
-        fs.writeFileSync(guideFile, JSON.stringify(implementationGuide, null, 2), 'utf8');
-        if (verbose) {
-          console.log('   ✅ Created IMPLEMENTATION_GUIDE.json');
+                ]
+              }
+            ],
+            "completed": true,
+            "timestamp": new Date().toISOString()
+          };
+          
+          fs.writeFileSync(guideFile, JSON.stringify(implementationGuide, null, 2), 'utf8');
+          if (verbose) {
+            console.log('   ✅ Created IMPLEMENTATION_GUIDE.json');
+          }
+        } else {
+          if (verbose) {
+            console.log('📋 IMPLEMENTATION_GUIDE.json already exists, preserving existing file');
+          }
         }
         
-        // Step 3: Create NEXTSESSION_PROMPT.md
-        if (verbose) {
-          console.log('📝 Creating NEXTSESSION_PROMPT.md...');
-        }
-        
-        const nextSessionPrompt = `# kc-orchestrator Next Session Prompt
+        // Step 3: Create NEXTSESSION_PROMPT.md (only if it doesn't exist)
+        if (!fs.existsSync(promptFile)) {
+          if (verbose) {
+            console.log('📝 Creating NEXTSESSION_PROMPT.md...');
+          }
+          
+          const nextSessionPrompt = `# kc-orchestrator Next Session Prompt
 
 ## Current Status
 
@@ -154,10 +161,15 @@ function initCommand(program) {
 
 This is a new kc-orchestrator initialization. Review the setup and plan next steps accordingly.
 `;
-        
-        fs.writeFileSync(promptFile, nextSessionPrompt, 'utf8');
-        if (verbose) {
-          console.log('   ✅ Created NEXTSESSION_PROMPT.md');
+          
+          fs.writeFileSync(promptFile, nextSessionPrompt, 'utf8');
+          if (verbose) {
+            console.log('   ✅ Created NEXTSESSION_PROMPT.md');
+          }
+        } else {
+          if (verbose) {
+            console.log('📝 NEXTSESSION_PROMPT.md already exists, preserving existing file');
+          }
         }
         
         // Step 4: Create config directory and basic config
