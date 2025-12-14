@@ -324,7 +324,10 @@ class ExecutionReportGenerator {
     
     // Analyze execution data for recommendations
     const summary = executionData.executionSummary || {};
-    const validationResults = executionData.validationResults || {};
+    const rawValidationResults = executionData.validationResults || {};
+    
+    // Generate validation results to get processed data
+    const processedValidationResults = this._generateValidationResults(executionData);
     
     // Success rate recommendations
     if (summary.successRate < 50) {
@@ -351,18 +354,18 @@ class ExecutionReportGenerator {
     }
 
     // Validation recommendations
-    if (validationResults.failedValidations > 0) {
+    if (processedValidationResults.failedValidations > 0) {
       recommendations.push({
         type: 'validation',
-        message: `Validation failures detected (${validationResults.failedValidations} failures).`,
+        message: `Validation failures detected (${processedValidationResults.failedValidations} failures).`,
         priority: 'high',
         action: 'Review validation criteria and task outputs'
       });
     }
 
     // AI judgment recommendations
-    if (validationResults.aiJudgments && validationResults.aiJudgments.length > 0) {
-      const lowConfidenceJudgments = validationResults.aiJudgments.filter(j => j.confidence < 70);
+    if (processedValidationResults.aiJudgments && processedValidationResults.aiJudgments.length > 0) {
+      const lowConfidenceJudgments = processedValidationResults.aiJudgments.filter(j => j.confidence < 70);
       if (lowConfidenceJudgments.length > 0) {
         recommendations.push({
           type: 'ai',

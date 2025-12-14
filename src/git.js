@@ -69,22 +69,33 @@ class GitRepositoryManager {
     }
 
     try {
-      // Check for .git directory
+      // Check for .git directory in current directory
       const gitDir = path.join(this.projectPath, '.git');
       if (fs.existsSync(gitDir)) {
         this.gitCache.isGitRepo = true;
         return true;
       }
 
-      // Try git command as fallback
-      execSync('git rev-parse --is-inside-work-tree', {
-        cwd: this.projectPath,
-        encoding: 'utf8',
-        timeout: this.timeout
-      });
+      // Try git command to check if this is the root of a git repository
+      try {
+        const result = execSync('git rev-parse --show-toplevel', {
+          cwd: this.projectPath,
+          encoding: 'utf8',
+          timeout: this.timeout
+        });
+        
+        // Check if the git root is the same as our project path
+        const gitRoot = result.trim();
+        if (gitRoot === this.projectPath) {
+          this.gitCache.isGitRepo = true;
+          return true;
+        }
+      } catch (gitError) {
+        // If git rev-parse fails, this is not a git repository
+      }
       
-      this.gitCache.isGitRepo = true;
-      return true;
+      this.gitCache.isGitRepo = false;
+      return false;
     } catch (error) {
       this.gitCache.isGitRepo = false;
       return false;

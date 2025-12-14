@@ -8,6 +8,8 @@
 const { ProviderManager } = require('./providers/ProviderManager');
 const { readGuide, writeGuide, updateTaskStatus } = require('./config');
 const { TaskExecutionError, TaskValidationError } = require('./errors');
+const { extractTasks, getTasksForExecution: extractTasksForExecution, normalizeTask } = require('./utils/taskExtractor');
+const { updateTaskStatusInGuide, canUpdateStatus } = require('./utils/taskStatusUpdater');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -103,24 +105,33 @@ class TaskExecutionEngine {
    */
   async getTasksForExecution() {
     try {
-      const guide = await readGuide(this.guidePath);
-      const tasks = guide.tasks || [];
+      // readGuide is synchronous, but we keep async for consistency
+      const guide = readGuide(this.guidePath, false); // Non-strict mode
+      if (!guide) {
+        this.log('error', 'Failed to read guide file');
+        return [];
+      }
       
-      // Filter out completed tasks and sort by order
-      const executableTasks = tasks
-        .filter(task => task.status === 'todo')
-        .sort((a, b) => {
-          // Sort by phase first, then by task order within phase
-          const phaseA = guide.phases.find(p => p.tasks.includes(a.id))?.order || 0;
-          const phaseB = guide.phases.find(p => p.tasks.includes(b.id))?.order || 0;
-          
-          if (phaseA !== phaseB) return phaseA - phaseB;
-          return (a.order || 0) - (b.order || 0);
-        });
+      // Extract tasks using flexible extractor
+      const allTasks = extractTasks(guide);
+      const executableTasks = extractTasksForExecution(guide);
+      
+      // Sort by order if available
+      executableTasks.sort((a, b) => {
+        // Sort by phase first, then by task order within phase
+        const phaseA = guide.phases?.find(p => p.tasks?.includes(a.id))?.order || 0;
+        const phaseB = guide.phases?.find(p => p.tasks?.includes(b.id))?.order || 0;
+        
+        if (phaseA !== phaseB) return phaseA - phaseB;
+        return (a.order || 0) - (b.order || 0);
+      });
       
       this.log('info', `Found ${executableTasks.length} tasks ready for execution`, {
-        totalTasks: tasks.length,
-        completedTasks: tasks.filter(t => t.status === 'completed').length
+        totalTasks: allTasks.length,
+        completedTasks: allTasks.filter(t => {
+          const normalized = normalizeTask(t);
+          return normalized?.status === 'completed';
+        }).length
       });
       
       return executableTasks;
@@ -168,6 +179,12 @@ class TaskExecutionEngine {
           taskTimeout: this.taskTimeout
         });
         
+        // Check if execution was actually successful
+        if (!result || result.success === false) {
+          const errorMsg = result?.error || 'Task execution returned no result';
+          throw new TaskExecutionError(`Task execution failed: ${errorMsg}`);
+        }
+        
         // Task executed successfully
         this.log('info', `Task completed successfully`, {
           taskId: task.id,
@@ -177,13 +194,27 @@ class TaskExecutionEngine {
         });
         
         // Update task status to completed
-        await updateTaskStatus(this.guidePath, task.id, 'completed');
+        try {
+          const guide = readGuide(this.guidePath, false);
+          if (guide && canUpdateStatus(guide)) {
+            if (updateTaskStatusInGuide(this.guidePath, task.id, 'completed')) {
+              this.log('info', `Updated task status to completed`, { taskId: task.id });
+            } else if (Array.isArray(guide.tasks)) {
+              updateTaskStatus(this.guidePath, task.id, 'completed');
+            }
+          }
+        } catch (updateError) {
+          this.log('warn', 'Failed to update task status to completed', {
+            taskId: task.id,
+            error: updateError.message
+          });
+        }
         
         return {
           success: true,
           taskId: task.id,
           provider: result.provider,
-          output: result.output,
+          output: result.result?.output || result.output,
           attempt,
           duration: Date.now() - startTime
         };
@@ -211,11 +242,20 @@ class TaskExecutionEngine {
     
     // Update task status to failed
     try {
-      await updateTaskStatus(this.guidePath, task.id, 'failed', {
-        error: lastError.message
-      });
+      const guide = readGuide(this.guidePath, false);
+      if (guide && canUpdateStatus(guide)) {
+        if (updateTaskStatusInGuide(this.guidePath, task.id, 'failed', {
+          error: lastError.message
+        })) {
+          this.log('info', `Updated task status to failed`, { taskId: task.id });
+        } else if (Array.isArray(guide.tasks)) {
+          updateTaskStatus(this.guidePath, task.id, 'failed', {
+            error: lastError.message
+          });
+        }
+      }
     } catch (updateError) {
-      this.log('error', `Failed to update task status to failed`, {
+      this.log('warn', `Failed to update task status to failed`, {
         taskId: task.id,
         error: updateError.message
       });

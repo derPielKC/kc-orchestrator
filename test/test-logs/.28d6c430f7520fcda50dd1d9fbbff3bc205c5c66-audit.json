@@ -9,6 +9,11 @@
             "date": 1765632692189,
             "name": "/tools/kc-orchestrator/test/test-logs/test-service-error-2025-12-13.log",
             "hash": "4603e871f61f4fdf319650cda27460291166fb6fc4837e5bd0ef3c9b6ce18b6f"
+        },
+        {
+            "date": 1765720015971,
+            "name": "/tools/kc-orchestrator/test/test-logs/test-service-error-2025-12-14.log",
+            "hash": "f937b66654eeed72e581f71fe99e782347818413708dbc903304472e4014f71e"
         }
     ],
     "hashType": "sha256"

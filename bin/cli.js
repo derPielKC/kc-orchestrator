@@ -25,8 +25,10 @@ Universal CLI orchestrator for multi-project repositories
 Examples:
   $ kc-orchestrator --help
   $ kc-orchestrator --version
-  $ kc-orchestrator --verbose --project my-project
-  $ kc-orchestrator --non-interactive --auto-answer "yes,no,default"
+  $ kc-orchestrator init --verbose
+  $ kc-orchestrator status
+  $ kc-orchestrator execute
+  $ kc-orchestrator continue
   $ kc-orchestrator improve --last 5 --project my-project
 `);
 
@@ -36,6 +38,18 @@ improveCommand(program);
 // Add init command
 const { initCommand } = require('../src/cli/init');
 initCommand(program);
+
+// Add status command
+const { statusCommand } = require('../src/cli/status');
+statusCommand(program);
+
+// Add execute command
+const { executeCommand } = require('../src/cli/execute');
+executeCommand(program);
+
+// Add continue command
+const { continueCommand } = require('../src/cli/continue');
+continueCommand(program);
 
 // Parse arguments
 program.parse(process.argv);

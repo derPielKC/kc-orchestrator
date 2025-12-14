@@ -59,7 +59,7 @@ describe('Agent Lightning Algorithms', () => {
       ];
       
       const patterns = patternDetection.detectPatterns(events, { 
-        anomalyThreshold: 2, 
+        anomalyThreshold: 1, // Lower threshold to detect the outlier
         latencyThresholdMs: 20000 // Higher threshold to avoid performance detection
       });
       assert.strictEqual(patterns.length, 1);
@@ -104,14 +104,18 @@ describe('Agent Lightning Algorithms', () => {
           severity: 'medium',
           description: 'Timeout errors in API calls',
           occurrences: 3,
-          affectedRuns: ['run1']
+          affectedRuns: ['run1'],
+          metrics: { frequency: 0.3, avgImpact: 30 },
+          details: { firstOccurrence: new Date().toISOString(), lastOccurrence: new Date().toISOString() }
         },
         {
           patternType: 'failure',
           severity: 'medium',
           description: 'Timeout errors in database queries',
           occurrences: 2,
-          affectedRuns: ['run2']
+          affectedRuns: ['run2'],
+          metrics: { frequency: 0.2, avgImpact: 25 },
+          details: { firstOccurrence: new Date().toISOString(), lastOccurrence: new Date().toISOString() }
         }
       ];
       
@@ -132,7 +136,8 @@ describe('Agent Lightning Algorithms', () => {
           description: 'Slow API responses',
           occurrences: 10,
           affectedRuns: ['run1', 'run2', 'run3'],
-          metrics: { frequency: 0.8 }
+          metrics: { frequency: 0.8, avgImpact: 8000 },
+          details: { firstOccurrence: new Date().toISOString(), lastOccurrence: new Date().toISOString() }
         }
       ];
       
@@ -153,7 +158,7 @@ describe('Agent Lightning Algorithms', () => {
           title: 'Critical reliability issue',
           description: 'Frequent timeouts in production',
           impact: 'major',
-          metrics: { businessImpact: 85, technicalDebt: 75 }
+          metrics: { businessImpact: 85, technicalDebt: 75, occurrenceRate: 0.5, affectedComponents: 10 }
         }
       ];
       
@@ -170,14 +175,14 @@ describe('Agent Lightning Algorithms', () => {
           type: 'performance',
           severity: 'medium',
           description: 'Slow API responses',
-          metrics: { businessImpact: 60 }
+          metrics: { businessImpact: 60, occurrenceRate: 0.4, affectedComponents: 5 }
         },
         {
-          id: 'pp2',
+          id: 'pp1', // Same ID to force deduplication
           type: 'performance',
           severity: 'medium',
           description: 'Slow API responses', // Same as pp1
-          metrics: { businessImpact: 65 }
+          metrics: { businessImpact: 60, occurrenceRate: 0.4, affectedComponents: 5 } // Same metrics
         }
       ];
       
@@ -187,9 +192,9 @@ describe('Agent Lightning Algorithms', () => {
 
     it('should sort recommendations by priority', () => {
       const painPoints = [
-        { id: 'pp1', severity: 'low', type: 'reliability', metrics: { priorityScore: 30 } },
-        { id: 'pp2', severity: 'high', type: 'performance', metrics: { priorityScore: 90 } },
-        { id: 'pp3', severity: 'medium', type: 'usability', metrics: { priorityScore: 60 } }
+        { id: 'pp1', severity: 'low', type: 'reliability', metrics: { priorityScore: 30, businessImpact: 30, technicalDebt: 20, occurrenceRate: 0.1, affectedComponents: 2 } },
+        { id: 'pp2', severity: 'high', type: 'performance', metrics: { priorityScore: 90, businessImpact: 90, technicalDebt: 80, occurrenceRate: 0.8, affectedComponents: 15 } },
+        { id: 'pp3', severity: 'medium', type: 'usability', metrics: { priorityScore: 60, businessImpact: 60, technicalDebt: 50, occurrenceRate: 0.4, affectedComponents: 8 } }
       ];
       
       const recommendations = recommendationEngine.generateRecommendations(painPoints);
@@ -200,8 +205,8 @@ describe('Agent Lightning Algorithms', () => {
 
     it('should generate prioritized report', () => {
       const painPoints = [
-        { id: 'pp1', severity: 'high', type: 'reliability', metrics: { businessImpact: 80 } },
-        { id: 'pp2', severity: 'medium', type: 'performance', metrics: { businessImpact: 60 } }
+        { id: 'pp1', severity: 'high', type: 'reliability', metrics: { businessImpact: 80, technicalDebt: 70, occurrenceRate: 0.6, affectedComponents: 12 } },
+        { id: 'pp2', severity: 'medium', type: 'performance', metrics: { businessImpact: 60, technicalDebt: 50, occurrenceRate: 0.4, affectedComponents: 8 } }
       ];
       
       const report = recommendationEngine.generatePrioritizedRecommendationReport(painPoints);

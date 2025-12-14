@@ -155,41 +155,58 @@
 
 ## Next Session Focus
 
-### ✅ Primary Objective: Complete Phase 9 Native Agent Lightning Integration (COMPLETED)
+### ✅ Primary Objective: Implement CLI Commands (COMPLETED)
 **Success Criteria**:
-- ✅ Native Agent Lightning wrapper module implemented
-- ✅ Core analysis algorithms extracted and integrated
-- ✅ External CLI calls replaced with native implementation
-- ✅ Comprehensive test suite created and passing
-- ✅ Performance improvements verified
-- ✅ Backward compatibility maintained
+- ✅ `status` command implemented - shows task status from IMPLEMENTATION_GUIDE.json
+- ✅ `execute` command implemented - executes tasks with provider selection
+- ✅ `continue`/`resume` command implemented - resumes interrupted executions
+- ✅ Support for various IMPLEMENTATION_GUIDE.json structures (standard, epics, meta)
+- ✅ Provider name normalization and selection working
+- ✅ Provider CLIs actually executing tasks (not just marking as completed)
 
-### ✅ Secondary Objective: Fix Remaining Test Issues (COMPLETED)
+### ✅ Secondary Objective: Fix Provider Execution (COMPLETED)
 **Success Criteria**:
-- ✅ Fix git test failures (reduced from many to 0)
-- ✅ Fix report test failures (reduced from 2 to 0)
-- ✅ Fix discovery test failures (reduced from 4 to 0)
-- ✅ Resolve mode switching issues in AgentLightningIntegration
-- ✅ Improve overall test pass rate from 92.5% to 94.8%
-- ✅ Maintain >85% code coverage
+- ✅ Provider CLIs are now actually executed (Codex: `codex exec`, Claude: `claude --print`)
+- ✅ Provider name normalization fixed (codex → Codex)
+- ✅ Success checking improved (checks result.success)
+- ✅ Status updates work with non-standard guide structures
+- ✅ Enhanced verbose logging for debugging
 
-## Implementation Plan
+## Recent Implementation
 
-### Task T9.6: Create Migration Guide and API Documentation
-**Implementation Steps**:
-1. Document migration path from external to native mode
-2. Create API reference for native Agent Lightning module
-3. Add performance comparison documentation
-4. Create troubleshooting guide for common issues
-5. Document all configuration options and examples
-
-### Task T9.7: Fix Remaining Test Issues
-**Implementation Steps**:
-1. Debug and fix integration test failures
-2. Resolve mode switching issues in AgentLightningIntegration
-3. Ensure consistent test behavior across environments
-4. Add missing test coverage for edge cases
-5. Verify all test suites pass consistently
+### Task: CLI Commands Implementation
+**Completed Steps**:
+1. ✅ Created `status` command (`src/cli/status.js`)
+   - Shows task status from IMPLEMENTATION_GUIDE.json
+   - Supports filtering by phase, status, project
+   - JSON and human-readable output formats
+   - Works with various guide structures
+2. ✅ Created `execute` command (`src/cli/execute.js`)
+   - Executes tasks from IMPLEMENTATION_GUIDE.json
+   - Supports single task, phase, or all tasks
+   - Provider selection via `--provider` option
+   - Telemetry integration
+3. ✅ Created `continue` command (`src/cli/continue.js`)
+   - Resumes interrupted executions
+   - Automatic checkpoint detection
+   - Manual checkpoint selection
+4. ✅ Created task extraction utilities (`src/utils/taskExtractor.js`)
+   - Extract tasks from different guide structures
+   - Normalize task formats
+   - Support for epics.chunks, meta.policies, standard tasks
+5. ✅ Created status update utilities (`src/utils/taskStatusUpdater.js`)
+   - Update status in various guide structures
+   - Atomic file operations
+   - Backup creation
+6. ✅ Fixed provider execution
+   - Codex uses `codex exec` for non-interactive execution
+   - Claude uses `claude --print` for non-interactive execution
+   - Provider name normalization fixed
+   - Success checking improved
+7. ✅ Enhanced provider integration
+   - Provider CLIs actually execute (not just mark as completed)
+   - Improved error handling
+   - Better logging and verbose output
 
 ## Development Priority Order
 1. **T9.6**: Create migration guide and API documentation (highest priority)

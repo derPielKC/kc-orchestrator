@@ -270,10 +270,16 @@ describe('GitRepositoryManager', () => {
   describe('Branch Management', () => {
     test('should list local branches', () => {
       // Ensure we're on master branch
-      repoGitManager.checkoutBranch('master');
+      const checkoutResult = repoGitManager.checkoutBranch('master');
+      expect(checkoutResult.success).toBe(true);
       
-      // Create a test branch
-      repoGitManager.createBranch('test-branch');
+      // Verify we're on master
+      const currentBranch = repoGitManager.getCurrentBranch();
+      expect(currentBranch.branch).toBe('master');
+      
+      // Create a test branch with unique name (don't checkout to stay on master)
+      const uniqueBranchName = 'test-branch-' + Date.now();
+      repoGitManager.createBranch(uniqueBranchName, false);
       
       // List branches
       const result = repoGitManager.listBranches();
@@ -284,13 +290,13 @@ describe('GitRepositoryManager', () => {
       expect(result.currentBranch).toBe('master');
       
       // Find the test branch
-      const testBranch = result.branches.find(b => b.name === 'test-branch');
+      const testBranch = result.branches.find(b => b.name === uniqueBranchName);
       expect(testBranch).toBeDefined();
       expect(testBranch.current).toBe(false);
       expect(testBranch.remote).toBe(false);
       
       // Clean up
-      repoGitManager.deleteBranch('test-branch');
+      repoGitManager.deleteBranch(uniqueBranchName);
     });
 
     test('should validate branch names', () => {
@@ -316,23 +322,24 @@ describe('GitRepositoryManager', () => {
       // Test long branch name
       validation = repoGitManager.validateBranchName('A'.repeat(101));
       expect(validation.valid).toBe(false);
-      expect(validation.errors).toContain('Branch name is too long');
+      expect(validation.errors).toContain('Branch name is too long (max 100 characters)');
     });
 
     test('should delete branches safely', () => {
-      // Create a test branch
-      repoGitManager.createBranch('delete-test');
+      // Create a test branch with unique name (don't checkout to stay on master)
+      const uniqueBranchName = 'delete-test-' + Date.now();
+      repoGitManager.createBranch(uniqueBranchName, false);
       
       // Delete the branch
-      const result = repoGitManager.deleteBranch('delete-test');
+      const result = repoGitManager.deleteBranch(uniqueBranchName);
       
       expect(result.success).toBe(true);
-      expect(result.branchName).toBe('delete-test');
+      expect(result.branchName).toBe(uniqueBranchName);
       expect(result.force).toBe(false);
       
       // Verify it's gone
       const branches = repoGitManager.listBranches();
-      const deletedBranch = branches.branches.find(b => b.name === 'delete-test');
+      const deletedBranch = branches.branches.find(b => b.name === uniqueBranchName);
       expect(deletedBranch).toBeUndefined();
     });
 
@@ -498,7 +505,7 @@ describe('GitRepositoryManager', () => {
       });
       
       // Test a valid but unusual branch name
-      const validUnusualName = 'branch-at-name';
+      const validUnusualName = 'branch-at-name-' + Date.now();
       const result = repoGitManager.createBranch(validUnusualName);
       expect(result.success).toBe(true);
       

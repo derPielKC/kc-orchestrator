@@ -50,20 +50,27 @@ class Provider {
     
     return new Promise((resolve, reject) => {
       // Create a temporary file for the prompt
-      const tempFile = path.join(cwd, `prompt_${Date.now()}.txt`);
+      const tempFile = path.join(cwd, `.kc-orchestrator_prompt_${Date.now()}.txt`);
       
       try {
         // Write prompt to temporary file
         fs.writeFileSync(tempFile, prompt, 'utf8');
         
-        // Build command
+        // Build command - provider-specific implementation
         const command = this.buildCommand(tempFile, options);
         
+        if (options.verbose || this.verbose) {
+          console.log(`🔧 Executing provider: ${this.name}`);
+          console.log(`   Command: ${command.substring(0, 150)}${command.length > 150 ? '...' : ''}`);
+        }
+        
         // Execute command with timeout
-        const child = exec(command, { env, cwd, timeout }, (error, stdout, stderr) => {
+        const child = exec(command, { env, cwd, timeout, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
           // Clean up temp file
           try {
-            fs.unlinkSync(tempFile);
+            if (fs.existsSync(tempFile)) {
+              fs.unlinkSync(tempFile);
+            }
           } catch (cleanupError) {
             console.warn(`Failed to clean up temp file ${tempFile}: ${cleanupError.message}`);
           }
@@ -92,9 +99,11 @@ class Provider {
         
         // Handle timeout separately
         const timeoutId = setTimeout(() => {
-          child.kill();
+          child.kill('SIGTERM');
           try {
-            fs.unlinkSync(tempFile);
+            if (fs.existsSync(tempFile)) {
+              fs.unlinkSync(tempFile);
+            }
           } catch (cleanupError) {
             console.warn(`Failed to clean up temp file ${tempFile}: ${cleanupError.message}`);
           }
@@ -200,29 +209,39 @@ class Provider {
       // Generate prompt
       const prompt = await this.generatePrompt(task, context);
       
+      if (context.verbose || this.verbose) {
+        console.log(`📝 Generated prompt (${prompt.length} chars) for task ${task.id}`);
+      }
+      
       // Execute CLI
       const executionResult = await this.executeCLI(prompt, {
         timeout: this.timeout,
+        verbose: context.verbose || this.verbose,
         ...context
       });
       
+      if (context.verbose || this.verbose) {
+        console.log(`✅ Provider ${this.name} execution completed`);
+        console.log(`   Output length: ${executionResult.stdout.length} chars`);
+      }
+      
       // Parse output
-      const parsedOutput = await this.parseOutput(executionResult);
+      const parsedOutput = await this.parseOutput(executionResult, context);
       
       // Return complete result
       return {
-        success: executionResult.exitCode === 0,
+        success: executionResult.exitCode === 0 && parsedOutput.success !== false,
         prompt,
         executionResult,
         parsedOutput,
+        output: parsedOutput.changes.length > 0 ? parsedOutput.changes[0].content : parsedOutput.raw,
         provider: this.name
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        provider: this.name
-      };
+      if (context.verbose || this.verbose) {
+        console.error(`❌ Provider ${this.name} execution failed: ${error.message}`);
+      }
+      throw error; // Re-throw to let ProviderManager handle fallback
     }
   }
 }

@@ -38,14 +38,12 @@ class ClaudeProvider extends Provider {
     // Build prompt with task context and requirements
     const promptParts = [];
     
-    // Add system message style header
-    promptParts.push('Human: Please help me implement the following task:');
-    promptParts.push('');
-    
     // Add task header
-    promptParts.push(`Task ID: ${task.id}`);
-    promptParts.push(`Title: ${task.title}`);
-    promptParts.push(`Description: ${task.description}`);
+    promptParts.push(`Task: ${task.id} - ${task.title || task.description || 'Untitled Task'}`);
+    
+    if (task.description) {
+      promptParts.push(`\nDescription:\n${task.description}`);
+    }
     
     // Add acceptance criteria
     if (task.acceptanceCriteria && task.acceptanceCriteria.length > 0) {
@@ -94,15 +92,7 @@ class ClaudeProvider extends Provider {
     }
     
     // Add execution instruction
-    promptParts.push('\nImplementation Instructions:');
-    promptParts.push('1. Analyze the task requirements above carefully');
-    promptParts.push('2. Generate the complete implementation code that satisfies all acceptance criteria');
-    promptParts.push('3. Follow all DO/DON\'T constraints strictly');
-    promptParts.push('4. Return the implementation code within a code block');
-    promptParts.push('5. Include brief comments explaining key decisions if helpful');
-    
-    // Add assistant response marker
-    promptParts.push('\nAssistant:');
+    promptParts.push('\nPlease implement this task according to the requirements above.');
     
     return promptParts.join('\n');
   }
@@ -231,19 +221,13 @@ class ClaudeProvider extends Provider {
    * @returns {string} Complete command string
    */
   buildCommand(promptFile, options = {}) {
-    // Base command with prompt file
-    let command = `${this.cliCommand} --prompt-file "${promptFile}"`;
+    // Claude uses --print for non-interactive execution
+    // Read prompt from file and pipe to claude --print
+    let command = `cat "${promptFile}" | ${this.cliCommand} --print`;
     
-    // Add default parameters
-    for (const [key, value] of Object.entries(this.defaultParams)) {
-      if (value !== undefined && value !== null) {
-        // Handle system prompt specially
-        if (key === 'system') {
-          command += ` --system-prompt "${value}"`;
-        } else {
-          command += ` --${key} "${value}"`;
-        }
-      }
+    // Add system prompt if available
+    if (this.defaultParams.system) {
+      command += ` --system-prompt "${this.defaultParams.system}"`;
     }
     
     // Add custom parameters from options

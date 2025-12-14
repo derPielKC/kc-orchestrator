@@ -15,13 +15,9 @@ class CodexProvider extends Provider {
       name: 'Codex',
       cliCommand: 'codex',
       defaultParams: {
-        model: 'code-davinci-002',
-        temperature: 0.2,
-        max_tokens: 2048,
-        stop: ['\n', ';'],
         ...options.defaultParams
       },
-      timeout: options.timeout || 60000, // 60 seconds for Codex
+      timeout: options.timeout || 300000, // 5 minutes for Codex
       maxRetries: options.maxRetries || 2,
       ...options
     });
@@ -39,12 +35,15 @@ class CodexProvider extends Provider {
     const promptParts = [];
     
     // Add task header
-    promptParts.push(`# Task: ${task.id} - ${task.title}`);
-    promptParts.push(`# Description: ${task.description}`);
+    promptParts.push(`Task: ${task.id} - ${task.title || task.description || 'Untitled Task'}`);
+    
+    if (task.description) {
+      promptParts.push(`\nDescription:\n${task.description}`);
+    }
     
     // Add acceptance criteria
     if (task.acceptanceCriteria && task.acceptanceCriteria.length > 0) {
-      promptParts.push('# Acceptance Criteria:');
+      promptParts.push('\nAcceptance Criteria:');
       task.acceptanceCriteria.forEach((criteria, index) => {
         promptParts.push(`  ${index + 1}. ${criteria}`);
       });
@@ -53,14 +52,14 @@ class CodexProvider extends Provider {
     // Add constraints
     if (task.constraints) {
       if (task.constraints.do && task.constraints.do.length > 0) {
-        promptParts.push('# DO:');
+        promptParts.push('\nDO:');
         task.constraints.do.forEach(item => {
           promptParts.push(`  - ${item}`);
         });
       }
       
       if (task.constraints.dont && task.constraints.dont.length > 0) {
-        promptParts.push('# DON\'T:');
+        promptParts.push('\nDON\'T:');
         task.constraints.dont.forEach(item => {
           promptParts.push(`  - ${item}`);
         });
@@ -69,7 +68,7 @@ class CodexProvider extends Provider {
     
     // Add outputs section
     if (task.outputs && task.outputs.length > 0) {
-      promptParts.push('# Expected Outputs:');
+      promptParts.push('\nExpected Outputs:');
       task.outputs.forEach(output => {
         promptParts.push(`  - ${output}`);
       });
@@ -77,7 +76,7 @@ class CodexProvider extends Provider {
     
     // Add check steps
     if (task.checkSteps && task.checkSteps.length > 0) {
-      promptParts.push('# Verification Commands:');
+      promptParts.push('\nVerification Commands:');
       task.checkSteps.forEach(step => {
         promptParts.push(`  - ${step}`);
       });
@@ -85,21 +84,37 @@ class CodexProvider extends Provider {
     
     // Add context information
     if (context.project) {
-      promptParts.push(`# Context: Project ${context.project}`);
+      promptParts.push(`\nContext: Project ${context.project}`);
     }
     
     // Add execution instruction
-    promptParts.push('\n# Implementation Instructions:');
-    promptParts.push('1. Analyze the task requirements above');
-    promptParts.push('2. Generate the complete implementation code');
-    promptParts.push('3. Ensure all acceptance criteria are met');
-    promptParts.push('4. Follow all DO/DON\'T constraints');
-    promptParts.push('5. Return only the implementation code, no explanations');
-    
-    // Add code block marker
-    promptParts.push('\n```');
+    promptParts.push('\nPlease implement this task according to the requirements above.');
     
     return promptParts.join('\n');
+  }
+  
+  /**
+   * Builds the CLI command to execute Codex
+   * 
+   * @param {string} promptFile - Path to prompt file
+   * @param {object} options - Execution options
+   * @returns {string} Complete command string
+   */
+  buildCommand(promptFile, options = {}) {
+    // Codex uses 'exec' subcommand for non-interactive execution
+    // Read prompt from file and pipe to codex exec
+    let command = `cat "${promptFile}" | ${this.cliCommand} exec`;
+    
+    // Add custom parameters from options
+    if (options.params) {
+      for (const [key, value] of Object.entries(options.params)) {
+        if (value !== undefined && value !== null) {
+          command += ` --${key} "${value}"`;
+        }
+      }
+    }
+    
+    return command;
   }
   
   /**
@@ -130,7 +145,7 @@ class CodexProvider extends Provider {
       let inCodeBlock = false;
       
       for (const line of lines) {
-        if (line.trim() === '```') {
+        if (line.trim().startsWith('```')) {
           inCodeBlock = !inCodeBlock;
           continue;
         }
@@ -177,29 +192,37 @@ class CodexProvider extends Provider {
    */
   async checkHealth() {
     try {
-      // Check if codex command is available
-      const healthCheck = await super.checkHealth();
+      // Try to execute version command
+      const versionCommand = `${this.cliCommand} --version`;
       
-      if (!healthCheck) {
-        console.warn('Codex CLI command not found or not working');
+      const result = await new Promise((resolve, reject) => {
+        const { exec } = require('child_process');
+        exec(versionCommand, { timeout: 5000 }, (error, stdout, stderr) => {
+          if (error) {
+            resolve({ success: false, error: error.message });
+          } else {
+            resolve({ success: true, version: stdout.trim() });
+          }
+        });
+      });
+      
+      if (!result.success) {
         return false;
       }
       
-      // Additional check for Codex-specific functionality
-      // Try to get model list if available
+      // Try to check if exec command is available
       try {
-        const { exec } = require('child_process');
-        await new Promise((resolve, reject) => {
-          exec('codex --list-models', { timeout: 10000 }, (error, stdout, stderr) => {
-            if (error) {
-              // This is optional, so don't fail if models command doesn't work
-              resolve(true);
-            } else {
-              console.log(`Codex models available: ${stdout.trim()}`);
-              resolve(true);
-            }
+        const execCheck = await new Promise((resolve, reject) => {
+          const { exec } = require('child_process');
+          exec(`${this.cliCommand} exec --help`, { timeout: 5000 }, (error) => {
+            resolve(!error);
           });
         });
+        
+        if (!execCheck) {
+          console.warn('Codex exec command not available');
+          return false;
+        }
       } catch (modelError) {
         // Models command not available, but basic health check passed
       }

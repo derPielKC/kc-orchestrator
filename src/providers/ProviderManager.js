@@ -37,6 +37,30 @@ class ProviderManager {
   }
   
   /**
+   * Normalize provider name to standard format
+   * 
+   * @param {string} name - Provider name in any format
+   * @returns {string} Normalized provider name
+   */
+  _normalizeProviderName(name) {
+    if (!name || typeof name !== 'string') return name;
+    
+    // Normalize common variations
+    const normalized = name.toLowerCase().trim();
+    
+    const nameMap = {
+      'codex': 'Codex',
+      'claude': 'Claude',
+      'vibe': 'Vibe',
+      'cursor-agent': 'CursorAgent',
+      'cursoragent': 'CursorAgent',
+      'cursor': 'CursorAgent'
+    };
+    
+    return nameMap[normalized] || name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+  }
+  
+  /**
    * Initialize provider instances based on configured order
    */
   _initializeProviders() {
@@ -48,12 +72,15 @@ class ProviderManager {
     };
     
     this.providerOrder.forEach(providerName => {
-      if (providerMap[providerName]) {
+      // Normalize provider name
+      const normalizedName = this._normalizeProviderName(providerName);
+      
+      if (providerMap[normalizedName]) {
         try {
-          this.providerInstances[providerName] = new providerMap[providerName]({
+          this.providerInstances[normalizedName] = new providerMap[normalizedName]({
             timeout: this.timeout
           });
-          this.providerStats[providerName] = {
+          this.providerStats[normalizedName] = {
             attempts: 0,
             successes: 0,
             failures: 0,
@@ -62,10 +89,10 @@ class ProviderManager {
             lastFailure: null
           };
         } catch (error) {
-          console.warn(`Failed to initialize provider ${providerName}: ${error.message}`);
+          console.warn(`Failed to initialize provider ${normalizedName}: ${error.message}`);
         }
       } else {
-        console.warn(`Unknown provider in configuration: ${providerName}`);
+        console.warn(`Unknown provider in configuration: ${providerName} (normalized: ${normalizedName})`);
       }
     });
     
@@ -153,21 +180,23 @@ class ProviderManager {
     
     // Try each provider in order
     for (const providerName of this.providerOrder) {
-      const provider = this.providerInstances[providerName];
+      // Normalize provider name to match instance keys
+      const normalizedName = this._normalizeProviderName(providerName);
+      const provider = this.providerInstances[normalizedName];
       
       if (!provider) {
         if (this.verbose) {
-          console.log(`⚠️  Skipping ${providerName} - not available`);
+          console.log(`⚠️  Skipping ${providerName} (normalized: ${normalizedName}) - not available`);
         }
         continue;
       }
       
-      // Update stats
-      this.providerStats[providerName].attempts++;
-      this.providerStats[providerName].lastUsed = new Date().toISOString();
+      // Update stats (use normalized name for stats)
+      this.providerStats[normalizedName].attempts++;
+      this.providerStats[normalizedName].lastUsed = new Date().toISOString();
       
       if (this.verbose) {
-        console.log(`🔄 Trying ${providerName} (attempt ${this.providerStats[providerName].attempts})`);
+        console.log(`🔄 Trying ${normalizedName} (attempt ${this.providerStats[normalizedName].attempts})`);
       }
       
       try {
@@ -177,18 +206,18 @@ class ProviderManager {
         });
         
         // Success!
-        this.providerStats[providerName].successes++;
-        this.providerStats[providerName].lastSuccess = new Date().toISOString();
+        this.providerStats[normalizedName].successes++;
+        this.providerStats[normalizedName].lastSuccess = new Date().toISOString();
         
         const endTime = Date.now();
         
         if (this.verbose) {
-          console.log(`✅ ${providerName} succeeded in ${endTime - startTime}ms`);
+          console.log(`✅ ${normalizedName} succeeded in ${endTime - startTime}ms`);
         }
         
         return {
           success: true,
-          provider: providerName,
+          provider: normalizedName,
           result: result,
           fallbackLog: fallbackLog,
           executionTime: endTime - startTime,
@@ -197,12 +226,12 @@ class ProviderManager {
         
       } catch (error) {
         // Failure - add to fallback log and continue
-        this.providerStats[providerName].failures++;
-        this.providerStats[providerName].lastFailure = new Date().toISOString();
+        this.providerStats[normalizedName].failures++;
+        this.providerStats[normalizedName].lastFailure = new Date().toISOString();
         lastError = error;
         
         const errorInfo = {
-          provider: providerName,
+          provider: normalizedName,
           error: error.message,
           timestamp: new Date().toISOString()
         };

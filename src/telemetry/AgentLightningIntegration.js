@@ -186,7 +186,6 @@ class AgentLightningIntegration {
       ...(nativeResult.legacyData || {})
     };
   }
-  }
   
   /**
    * Build Agent Lightning command

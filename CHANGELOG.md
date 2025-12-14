@@ -8,6 +8,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **CLI Commands: status, execute, continue**
+  - `status` command to show task status from IMPLEMENTATION_GUIDE.json
+  - `execute` command to run tasks with provider selection
+  - `continue`/`resume` command to resume interrupted executions
+  - Support for various IMPLEMENTATION_GUIDE.json structures (standard, epics, meta)
+- **Flexible Task Extraction** (`src/utils/taskExtractor.js`)
+  - Extract tasks from different guide structures
+  - Normalize task formats automatically
+  - Support for epics.chunks, meta.policies, and standard tasks arrays
+- **Flexible Status Updates** (`src/utils/taskStatusUpdater.js`)
+  - Update task status in various guide structures
+  - Atomic file operations with backup
+  - Support for non-standard guide formats
+- **Provider Name Normalization** (`src/providers/ProviderManager.js`)
+  - Automatic normalization of provider names (codex → Codex)
+  - Support for various provider name formats
+  - Improved provider initialization
+- **Improved Provider Execution**
+  - Codex provider uses `codex exec` for non-interactive execution
+  - Claude provider uses `claude --print` for non-interactive execution
+  - Proper stdin/stdout handling for provider CLIs
+  - Enhanced verbose logging for provider execution
+- **Usage Guide** (`USAGE_GUIDE.md`)
+  - Comprehensive German documentation
+  - Examples for all commands
+  - Troubleshooting section
+
+### Changed
+- **Enhanced Provider Integration**
+  - Provider CLIs are now actually executed (not just marked as completed)
+  - Improved error handling and success checking
+  - Better logging and verbose output
+- **Flexible Guide Structure Support**
+  - `status` command works with epics/chunks structure
+  - `execute` command supports various task formats
+  - Status updates work with non-standard structures
+- **Improved CLI Interface**
+  - Better help text and examples
+  - Provider selection via `--provider` option
+  - Enhanced verbose mode
+
+### Fixed
+- **Provider Recognition**
+  - Fixed provider name normalization issue
+  - Providers are now correctly found and initialized
+  - Provider fallback mechanism works correctly
+- **Task Execution**
+  - Tasks are now actually executed (not just marked as completed)
+  - Proper success/failure checking
+  - Status updates work with various guide structures
+- **Status Updates**
+  - Status updates work with epics.chunks structure
+  - Atomic file operations prevent corruption
+  - Better error handling for non-standard structures
+
+## [0.1.0] - 2024-12-12
+
+### Added
 - Complete Phase 1: Discovery and Configuration
   - Repository root discovery with git command fallback
   - Project folder discovery with IMPLEMENTATION_GUIDE.json detection
@@ -98,22 +156,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pain point detection** algorithms for accurate analysis
 - **Duplicate detection** for task generation
 
-## [0.1.0] - 2024-12-12
-
-### Added
-- Initial project structure and package.json
-- Basic discovery functionality
-- CLI argument parsing foundation
-- Unit test infrastructure
-
-### Changed
-- Initial implementation following refined requirements
-- CLI-first approach for provider integrations
-- Simplified MVP execution engine design
-
-### Fixed
-- Initial setup and configuration issues
-
 ## Project Status
 
 **Current Version**: 0.1.0 (Pre-release)
@@ -135,7 +177,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 86 agent-lightning tests (NativeAgentLightning, algorithms, integration)
 - 35 remaining failing tests (mostly complex integration scenarios)
 
-**Current Status**: All core phases complete, native Agent Lightning integration working, significant test improvements
+**Current Status**: All core phases complete, CLI commands implemented, provider execution working
 
 **Next Steps**:
 - Regular execution of `kc-orchestrator improve` for continuous improvement

@@ -7,8 +7,8 @@ describe('Repository Discovery', () => {
   let testDir;
   
   beforeAll(() => {
-    // Create a temporary test directory structure
-    testDir = fs.mkdtempSync(path.join(__dirname, 'test-repo-'));
+    // Create a temporary test directory structure outside of git repo
+    testDir = fs.mkdtempSync(path.join('/tmp', 'test-repo-'));
     
     // Create a mock git directory
     const gitDir = path.join(testDir, '.git');
@@ -33,7 +33,7 @@ describe('Repository Discovery', () => {
     });
     
     it('should return null when not in a repository', () => {
-      const tempDir = fs.mkdtempSync(path.join(__dirname, 'no-repo-'));
+      const tempDir = fs.mkdtempSync(path.join('/tmp', 'no-repo-'));
       const result = findRepoRoot(tempDir);
       expect(result).toBeNull();
       
@@ -63,7 +63,8 @@ describe('Repository Discovery', () => {
     });
     
     it('should return null when git is not available or not in repo', () => {
-      const tempDir = fs.mkdtempSync(path.join(__dirname, 'no-git-'));
+      // Create temp directory outside of git repository
+      const tempDir = fs.mkdtempSync(path.join('/tmp', 'no-git-'));
       const result = findRepoRootWithGit(tempDir);
       expect(result).toBeNull();
       
@@ -182,7 +183,7 @@ describe('Repository Discovery', () => {
     let testDir;
     
     beforeAll(() => {
-      testDir = fs.mkdtempSync(path.join(__dirname, 'repo-root-test-'));
+      testDir = fs.mkdtempSync(path.join('/tmp', 'repo-root-test-'));
       
       // Create a simple project
       const projectDir = path.join(testDir, 'test-project');

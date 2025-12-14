@@ -27,7 +27,7 @@ build/
 bower_components/
 
 # Jest
-jest.config.js
+
 
 # Agent Lightning
 agentent-lightning/

@@ -5,38 +5,44 @@ const path = require('path');
  * Validates an IMPLEMENTATION_GUIDE.json structure
  * 
  * @param {object} guide - The guide object to validate
+ * @param {boolean} strict - If true, enforce strict validation (default: false)
  * @returns {boolean} True if valid, false otherwise
  */
-function validateImplementationGuide(guide) {
+function validateImplementationGuide(guide, strict = false) {
   if (!guide || typeof guide !== 'object') {
     return false;
   }
   
-  // Check required fields
-  if (!guide.project || typeof guide.project !== 'string') {
+  // Check for project name (can be in root or meta.project)
+  const projectName = guide.project || (guide.meta && guide.meta.project);
+  if (!projectName || typeof projectName !== 'string') {
     return false;
   }
   
-  if (!guide.tasks || !Array.isArray(guide.tasks)) {
-    return false;
+  // In strict mode, require tasks array
+  if (strict) {
+    if (!guide.tasks || !Array.isArray(guide.tasks)) {
+      return false;
+    }
+    
+    // Validate each task has required fields
+    for (const task of guide.tasks) {
+      if (!task.id || typeof task.id !== 'string') {
+        return false;
+      }
+      if (!task.title || typeof task.title !== 'string') {
+        return false;
+      }
+      if (!task.status || typeof task.status !== 'string') {
+        return false;
+      }
+      if (!task.acceptanceCriteria || !Array.isArray(task.acceptanceCriteria)) {
+        return false;
+      }
+    }
   }
   
-  // Validate each task has required fields
-  for (const task of guide.tasks) {
-    if (!task.id || typeof task.id !== 'string') {
-      return false;
-    }
-    if (!task.title || typeof task.title !== 'string') {
-      return false;
-    }
-    if (!task.status || typeof task.status !== 'string') {
-      return false;
-    }
-    if (!task.acceptanceCriteria || !Array.isArray(task.acceptanceCriteria)) {
-      return false;
-    }
-  }
-  
+  // In non-strict mode, just check that it's a valid JSON object with a project name
   return true;
 }
 
@@ -46,16 +52,28 @@ function validateImplementationGuide(guide) {
  * @param {string} filePath - Path to the IMPLEMENTATION_GUIDE.json file
  * @returns {object|null} Parsed guide object or null if invalid
  */
-function readGuide(filePath) {
+function readGuide(filePath, strict = false) {
   try {
     const content = fs.readFileSync(filePath, 'utf8');
     const guide = JSON.parse(content);
     
-    if (validateImplementationGuide(guide)) {
+    if (validateImplementationGuide(guide, strict)) {
       return guide;
     } else {
-      console.warn(`Invalid IMPLEMENTATION_GUIDE.json structure at ${filePath}`);
-      return null;
+      const projectName = guide.project || (guide.meta && guide.meta.project) || 'unknown';
+      const hasTasks = Array.isArray(guide.tasks) && guide.tasks.length > 0;
+      const hasEpics = Array.isArray(guide.epics) && guide.epics.length > 0;
+      
+      if (strict) {
+        console.warn(`Invalid IMPLEMENTATION_GUIDE.json structure at ${filePath}`);
+        console.warn(`  Project: ${projectName}`);
+        console.warn(`  Has tasks array: ${hasTasks}`);
+        console.warn(`  Has epics array: ${hasEpics}`);
+        return null;
+      } else {
+        // In non-strict mode, return the guide even if it doesn't match expected structure
+        return guide;
+      }
     }
   } catch (error) {
     console.error(`Failed to read or parse ${filePath}: ${error.message}`);
@@ -118,8 +136,14 @@ function writeGuide(filePath, guide) {
  * @returns {boolean} True if successful, false otherwise
  */
 function updateTaskStatus(filePath, taskId, newStatus) {
-  const guide = readGuide(filePath);
+  const guide = readGuide(filePath, false);
   if (!guide) {
+    return false;
+  }
+  
+  // Check if guide has standard tasks structure
+  if (!Array.isArray(guide.tasks)) {
+    // Non-standard structure - cannot update status
     return false;
   }
   

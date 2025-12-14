@@ -18,17 +18,27 @@ npm install -g .
 # Basic help
 kc-orchestrator --help
 
+# Initialize project
+kc-orchestrator init
+
+# Show task status
+kc-orchestrator status
+kc-orchestrator status --json
+kc-orchestrator status --status todo
+
+# Execute tasks
+kc-orchestrator execute
+kc-orchestrator execute --task T1.1
+kc-orchestrator execute --provider codex
+kc-orchestrator execute --phase "Phase 1" --verbose
+
+# Resume interrupted execution
+kc-orchestrator continue
+kc-orchestrator resume --checkpoint .kc-orchestrator/checkpoints/checkpoint-123.json
+
 # Run continuous improvement analysis
-kc-orchestrator improve --help
 kc-orchestrator improve --last 5 --project my-project
 kc-orchestrator improve --last 1 --dry-run
-
-# Test Ollama client
-node -e "const { OllamaClient } = require('./src/ollama'); const client = new OllamaClient(); console.log('Ollama client ready:', client.defaultModel);"
-
-# Test telemetry components
-node -e "const { TelemetryManager } = require('./src/telemetry/TelemetryManager'); console.log('TelemetryManager loaded');"
-node -e "const { RunSummarizer } = require('./src/telemetry/RunSummarizer'); console.log('RunSummarizer loaded');"
 ```
 
 ## Features
@@ -38,7 +48,19 @@ node -e "const { RunSummarizer } = require('./src/telemetry/RunSummarizer'); con
 - ✅ Interactive interview system for ambiguity resolution
 - ✅ CLI provider interface (base class for AI providers)
 - ✅ AI provider implementations (Codex, Claude, Vibe, Cursor Agent)
-- ✅ Task execution engine with validation
+- ✅ **Task execution with provider selection**
+  - Execute tasks from IMPLEMENTATION_GUIDE.json
+  - Select specific AI provider (codex, claude, vibe, cursor-agent)
+  - Support for various guide structures (standard, epics, meta)
+  - Status tracking and updates
+- ✅ **Task status management**
+  - View task status with `status` command
+  - Filter by phase, status, or project
+  - JSON and human-readable output formats
+- ✅ **Resume interrupted executions**
+  - Checkpoint-based recovery
+  - Automatic checkpoint detection
+  - Manual checkpoint selection
 - ✅ Git workflow integration
 - ✅ Ollama integration for log analysis
 - ✅ **Continuous Improvement with Agent Lightning**

@@ -305,7 +305,7 @@ describe('ExecutionReportGenerator', () => {
       
       // Verify content
       const content = fs.readFileSync(reportPath, 'utf8');
-      expect(content).toContain('<html>');
+      expect(content).toContain('<!DOCTYPE html>');
       expect(content).toContain('kc-orchestrator Execution Report');
       expect(content).toContain('Execution Summary');
     });
