@@ -152,22 +152,46 @@ class TaskExecutionEngine {
     let attempt = 0;
     let lastError = null;
     
+    // Normalize task to ensure ID exists
+    const normalizedTask = require('./utils/taskExtractor').normalizeTask(task);
+    const taskId = normalizedTask.id || task.id || 'unknown';
+    const taskTitle = normalizedTask.title || task.title || task.description || 'Untitled Task';
+    
     this.log('info', `Starting task execution`, {
-      taskId: task.id,
-      taskTitle: task.title,
+      taskId,
+      taskTitle,
       attempt: attempt + 1
     });
     
-    // Update task status to in_progress
-    try {
-      await updateTaskStatus(this.guidePath, task.id, 'in_progress');
-    } catch (error) {
-      this.log('error', `Failed to update task status to in_progress`, {
-        taskId: task.id,
-        error: error.message
-      });
-      throw new TaskExecutionError(`Failed to update task status: ${error.message}`, error);
+    if (this.verbose) {
+      console.log(`\n📋 Task Details:`);
+      console.log(`   ID: ${taskId}`);
+      console.log(`   Title: ${taskTitle}`);
+      if (task.description && task.description !== taskTitle) {
+        console.log(`   Description: ${task.description.substring(0, 100)}${task.description.length > 100 ? '...' : ''}`);
+      }
+      console.log(`   Status: ${normalizedTask.status || task.status || 'todo'}`);
     }
+    
+      // Update task status to in_progress
+      try {
+        const guide = readGuide(this.guidePath, false);
+        if (guide && canUpdateStatus(guide)) {
+          if (updateTaskStatusInGuide(this.guidePath, taskId, 'in_progress')) {
+            if (this.verbose) {
+              console.log(`   ✅ Status updated to in_progress`);
+            }
+          } else if (Array.isArray(guide.tasks)) {
+            updateTaskStatus(this.guidePath, taskId, 'in_progress');
+          }
+        }
+      } catch (error) {
+        this.log('warn', `Failed to update task status to in_progress`, {
+          taskId,
+          error: error.message
+        });
+        // Don't throw - continue execution even if status update fails
+      }
     
     // Execute task with retries and provider fallback
     while (attempt < this.maxRetries) {
@@ -186,87 +210,138 @@ class TaskExecutionEngine {
         }
         
         // Task executed successfully
+        const duration = Date.now() - startTime;
         this.log('info', `Task completed successfully`, {
-          taskId: task.id,
+          taskId,
           attempt,
-          duration: Date.now() - startTime,
-          provider: result.provider
+          duration,
+          provider: result.provider || 'unknown'
         });
+        
+        if (this.verbose) {
+          console.log(`\n✅ Task completed successfully:`);
+          console.log(`   Task ID: ${taskId}`);
+          console.log(`   Provider: ${result.provider || 'unknown'}`);
+          console.log(`   Duration: ${(duration / 1000).toFixed(2)}s`);
+          console.log(`   Attempts: ${attempt}`);
+          if (result.result && result.result.parsedOutput) {
+            const output = result.result.parsedOutput;
+            if (output.changes && output.changes.length > 0) {
+              console.log(`   Changes: ${output.changes.length} file(s)`);
+            }
+            if (output.logs && output.logs.length > 0) {
+              console.log(`   Logs: ${output.logs.length} message(s)`);
+            }
+          }
+        }
         
         // Update task status to completed
         try {
           const guide = readGuide(this.guidePath, false);
           if (guide && canUpdateStatus(guide)) {
-            if (updateTaskStatusInGuide(this.guidePath, task.id, 'completed')) {
-              this.log('info', `Updated task status to completed`, { taskId: task.id });
+            if (updateTaskStatusInGuide(this.guidePath, taskId, 'completed')) {
+              if (this.verbose) {
+                console.log(`   ✅ Status updated to completed`);
+              }
+              this.log('info', `Updated task status to completed`, { taskId });
             } else if (Array.isArray(guide.tasks)) {
-              updateTaskStatus(this.guidePath, task.id, 'completed');
+              updateTaskStatus(this.guidePath, taskId, 'completed');
             }
           }
         } catch (updateError) {
           this.log('warn', 'Failed to update task status to completed', {
-            taskId: task.id,
+            taskId,
             error: updateError.message
           });
         }
         
         return {
           success: true,
-          taskId: task.id,
-          provider: result.provider,
+          taskId,
+          provider: result.provider || 'unknown',
           output: result.result?.output || result.output,
           attempt,
-          duration: Date.now() - startTime
+          duration
         };
       } catch (error) {
         lastError = error;
+        const errorDuration = Date.now() - startTime;
         this.log('warn', `Task execution failed on attempt ${attempt}`, {
-          taskId: task.id,
+          taskId,
           error: error.message,
-          provider: error.provider || 'unknown'
+          provider: error.provider || result?.provider || 'unknown',
+          duration: errorDuration
         });
         
+        if (this.verbose) {
+          console.log(`\n❌ Task execution failed (attempt ${attempt}/${this.maxRetries}):`);
+          console.log(`   Task ID: ${taskId}`);
+          console.log(`   Error: ${error.message}`);
+          console.log(`   Provider: ${error.provider || result?.provider || 'unknown'}`);
+          console.log(`   Duration: ${(errorDuration / 1000).toFixed(2)}s`);
+        }
+        
         if (attempt < this.maxRetries) {
-          this.log('info', `Retrying task (attempt ${attempt + 1}/${this.maxRetries})`, {
-            taskId: task.id
+          const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+          this.log('info', `Retrying task (attempt ${attempt + 1}/${this.maxRetries}) after ${retryDelay}ms`, {
+            taskId
           });
+          
+          if (this.verbose) {
+            console.log(`   ⏳ Waiting ${retryDelay}ms before retry...`);
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
         }
       }
     }
     
     // All attempts failed
+    const totalDuration = Date.now() - startTime;
     this.log('error', `Task failed after ${this.maxRetries} attempts`, {
-      taskId: task.id,
-      error: lastError.message
+      taskId,
+      error: lastError.message,
+      duration: totalDuration
     });
+    
+    if (this.verbose) {
+      console.log(`\n❌ Task failed after ${this.maxRetries} attempts:`);
+      console.log(`   Task ID: ${taskId}`);
+      console.log(`   Error: ${lastError.message}`);
+      console.log(`   Total Duration: ${(totalDuration / 1000).toFixed(2)}s`);
+    }
     
     // Update task status to failed
     try {
       const guide = readGuide(this.guidePath, false);
       if (guide && canUpdateStatus(guide)) {
-        if (updateTaskStatusInGuide(this.guidePath, task.id, 'failed', {
+        if (updateTaskStatusInGuide(this.guidePath, taskId, 'failed', {
           error: lastError.message
         })) {
-          this.log('info', `Updated task status to failed`, { taskId: task.id });
+          if (this.verbose) {
+            console.log(`   ✅ Status updated to failed`);
+          }
+          this.log('info', `Updated task status to failed`, { taskId });
         } else if (Array.isArray(guide.tasks)) {
-          updateTaskStatus(this.guidePath, task.id, 'failed', {
+          updateTaskStatus(this.guidePath, taskId, 'failed', {
             error: lastError.message
           });
         }
       }
     } catch (updateError) {
       this.log('warn', `Failed to update task status to failed`, {
-        taskId: task.id,
+        taskId,
         error: updateError.message
       });
     }
     
     const errorType = this.classifyError(lastError);
     const executionError = new TaskExecutionError(
-      `Task ${task.id} failed after ${this.maxRetries} attempts: ${lastError.message}`,
+      `Task ${taskId} failed after ${this.maxRetries} attempts: ${lastError.message}`,
       lastError
     );
     executionError.errorType = errorType;
+    executionError.taskId = taskId;
     throw executionError;
   }
 
@@ -621,6 +696,17 @@ class TaskExecutionEngine {
       // Execute tasks sequentially with checkpointing
       for (let i = currentTaskIndex; i < tasks.length; i++) {
         const task = tasks[i];
+        const normalized = require('./utils/taskExtractor').normalizeTask(task);
+        const taskId = normalized.id || task.id || 'unknown';
+        const taskTitle = normalized.title || task.title || task.description || 'Untitled Task';
+        
+        if (this.verbose) {
+          console.log(`\n${'='.repeat(60)}`);
+          console.log(`Task ${i + 1}/${tasks.length}: ${taskId}`);
+          console.log(`Title: ${taskTitle}`);
+          console.log(`${'='.repeat(60)}`);
+        }
+        
         let attempt = 0;
         let lastError = null;
         
@@ -645,24 +731,42 @@ class TaskExecutionEngine {
           try {
             const taskResult = await this.executeTask(task);
             results.completed++;
+            const normalized = require('./utils/taskExtractor').normalizeTask(task);
+            const finalTaskId = normalized.id || task.id || 'unknown';
             results.executionLog.push({
-              taskId: task.id,
+              taskId: finalTaskId,
               status: 'completed',
               ...taskResult
             });
+            
+            if (this.verbose) {
+              console.log(`\n✅ Task ${i + 1}/${tasks.length} completed successfully`);
+              console.log(`   Progress: ${results.completed} completed, ${results.failed} failed, ${tasks.length - i - 1} remaining`);
+            }
+            
             break; // Task completed successfully, move to next task
             
           } catch (error) {
             lastError = error;
             attempt++;
             
+            const normalized = require('./utils/taskExtractor').normalizeTask(task);
+            const finalTaskId = normalized.id || task.id || 'unknown';
+            
             // Classify error and decide recovery strategy
             const errorType = this.classifyError(error);
             this.log('warn', `Task failed with ${errorType} error (attempt ${attempt}/${this.maxRetries})`, {
-              taskId: task.id,
+              taskId: finalTaskId,
               errorType,
               error: error.message
             });
+            
+            if (this.verbose) {
+              console.log(`\n⚠️  Task failed (attempt ${attempt}/${this.maxRetries}):`);
+              console.log(`   Task ID: ${finalTaskId}`);
+              console.log(`   Error Type: ${errorType}`);
+              console.log(`   Error: ${error.message}`);
+            }
             
             // Check if we should retry
             if (!this.shouldRetry(error, attempt)) {

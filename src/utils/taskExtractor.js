@@ -57,8 +57,20 @@ function normalizeTask(task) {
     return null;
   }
   
-  // Extract ID
-  const id = task.id || task.chunk_id || task.taskId || 'unknown';
+  // Extract ID - be more thorough
+  let id = task.id || task.chunk_id || task.taskId;
+  
+  // If still no ID, try to generate one from other fields
+  if (!id) {
+    // Try to use description/title as fallback (hash it for uniqueness)
+    const fallback = task.description || task.title || task.name;
+    if (fallback) {
+      const crypto = require('crypto');
+      id = 'TASK-' + crypto.createHash('md5').update(fallback.substring(0, 50)).digest('hex').substring(0, 8);
+    } else {
+      id = 'unknown';
+    }
+  }
   
   // Extract title
   const title = task.title || task.description || task.name || 'Untitled Task';

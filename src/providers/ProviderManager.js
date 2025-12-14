@@ -173,10 +173,15 @@ class ProviderManager {
     const fallbackLog = [];
     let lastError = null;
     
-    if (this.verbose) {
-      console.log(`🚀 Starting task ${task.id} with fallback strategy`);
-      console.log(`📋 Provider order: ${this.providerOrder.join(' > ')}`);
-    }
+      if (this.verbose) {
+        const { normalizeTask } = require('../utils/taskExtractor');
+        const normalized = normalizeTask(task);
+        console.log(`\n🚀 Starting task execution with fallback strategy`);
+        console.log(`   Task ID: ${normalized.id || task.id || 'unknown'}`);
+        console.log(`   Task Title: ${normalized.title || task.title || task.description || 'Untitled'}`);
+        console.log(`   Provider order: ${this.providerOrder.join(' > ')}`);
+        console.log(`   Available providers: ${Object.keys(this.providerInstances).join(', ')}`);
+      }
     
     // Try each provider in order
     for (const providerName of this.providerOrder) {
@@ -196,13 +201,17 @@ class ProviderManager {
       this.providerStats[normalizedName].lastUsed = new Date().toISOString();
       
       if (this.verbose) {
-        console.log(`🔄 Trying ${normalizedName} (attempt ${this.providerStats[normalizedName].attempts})`);
+        console.log(`\n🔄 Trying provider: ${normalizedName}`);
+        console.log(`   Attempt: ${this.providerStats[normalizedName].attempts}`);
+        console.log(`   Previous attempts: ${this.providerStats[normalizedName].attempts - 1} success, ${this.providerStats[normalizedName].failures} failures`);
       }
       
+      const providerStartTime = Date.now();
       try {
         const result = await provider.executeTask(task, {
           ...context,
-          maxRetries: maxRetries
+          maxRetries: maxRetries,
+          verbose: this.verbose
         });
         
         // Success!
@@ -210,9 +219,19 @@ class ProviderManager {
         this.providerStats[normalizedName].lastSuccess = new Date().toISOString();
         
         const endTime = Date.now();
+        const providerDuration = endTime - providerStartTime;
         
         if (this.verbose) {
-          console.log(`✅ ${normalizedName} succeeded in ${endTime - startTime}ms`);
+          console.log(`\n✅ ${normalizedName} succeeded!`);
+          console.log(`   Duration: ${(providerDuration / 1000).toFixed(2)}s`);
+          if (result.parsedOutput) {
+            if (result.parsedOutput.changes && result.parsedOutput.changes.length > 0) {
+              console.log(`   Changes: ${result.parsedOutput.changes.length} file(s)`);
+            }
+            if (result.parsedOutput.logs && result.parsedOutput.logs.length > 0) {
+              console.log(`   Logs: ${result.parsedOutput.logs.length} message(s)`);
+            }
+          }
         }
         
         return {
@@ -249,7 +268,15 @@ class ProviderManager {
         fallbackLog.push(errorInfo);
         
         if (this.verbose) {
-          console.log(`❌ ${providerName} failed: ${error.message}`);
+          const providerDuration = Date.now() - providerStartTime;
+          console.log(`\n❌ ${normalizedName} failed:`);
+          console.log(`   Error: ${error.message}`);
+          console.log(`   Duration: ${(providerDuration / 1000).toFixed(2)}s`);
+          if (error.result) {
+            if (error.result.stderr) {
+              console.log(`   Stderr: ${error.result.stderr.substring(0, 200)}${error.result.stderr.length > 200 ? '...' : ''}`);
+            }
+          }
           console.log(`🔄 Falling back to next provider...`);
         }
         

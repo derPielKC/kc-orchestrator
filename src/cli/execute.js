@@ -27,6 +27,38 @@ function executeCommand(program) {
     .option('--non-interactive', 'Disable interactive prompts', false)
     .option('--verbose', 'Enable verbose output', false)
     .action(async (options) => {
+      // Setup graceful shutdown handler
+      let shutdownRequested = false;
+      let currentExecution = null;
+      
+      const gracefulShutdown = async (signal) => {
+        if (shutdownRequested) {
+          console.log('\n⚠️  Force shutdown requested. Exiting immediately...');
+          process.exit(1);
+        }
+        
+        shutdownRequested = true;
+        console.log(`\n\n⚠️  Received ${signal}. Finishing current task and saving checkpoint...`);
+        console.log('   Press Ctrl+C again to force exit.');
+        
+        if (currentExecution) {
+          try {
+            // Wait a bit for current task to finish
+            await Promise.race([
+              currentExecution,
+              new Promise(resolve => setTimeout(resolve, 5000))
+            ]);
+          } catch (error) {
+            // Ignore errors during shutdown
+          }
+        }
+        
+        console.log('✅ Checkpoint saved. Exiting gracefully...');
+        process.exit(0);
+      };
+      
+      process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+      process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
       try {
         const verbose = options.verbose || program.opts().verbose;
         const nonInteractive = options.nonInteractive || program.opts().nonInteractive;
@@ -224,11 +256,35 @@ function executeCommand(program) {
           // Execute all tasks
           if (verbose) {
             console.log('📋 Executing all tasks...');
+            const { readGuide: readGuideConfig } = require('../config');
+            const guide = readGuideConfig(guidePath, false);
+            const { getTasksForExecution } = require('../utils/taskExtractor');
+            const executableTasks = getTasksForExecution(guide);
+            console.log(`   Found ${executableTasks.length} tasks ready for execution`);
+            if (executableTasks.length > 0 && verbose) {
+              console.log('   First few tasks:');
+              executableTasks.slice(0, 5).forEach((task, idx) => {
+                const normalized = require('../utils/taskExtractor').normalizeTask(task);
+                console.log(`     ${idx + 1}. ${normalized.id}: ${normalized.title?.substring(0, 60) || 'No title'}`);
+              });
+              if (executableTasks.length > 5) {
+                console.log(`     ... and ${executableTasks.length - 5} more`);
+              }
+            }
           }
           
-          result = await engine.executeAllTasksWithRecovery({
+          // Wrap execution in promise for graceful shutdown
+          const executionPromise = engine.executeAllTasksWithRecovery({
             resume: false
           });
+          currentExecution = executionPromise;
+          
+          result = await executionPromise;
+          
+          if (shutdownRequested) {
+            console.log('⚠️  Execution interrupted by user');
+            process.exit(0);
+          }
         }
         
         // Log completion
