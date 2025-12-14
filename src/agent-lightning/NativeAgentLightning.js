@@ -5,7 +5,26 @@
 
 const { performance } = require('perf_hooks');
 const utils = require('./utils');
-const logger = require('../logger');
+
+// Simple logger fallback if main logger not available
+const simpleLogger = {
+  debug: console.debug,
+  info: console.info,
+  warn: console.warn,
+  error: console.error,
+  createLogger: (name, config) => simpleLogger
+};
+
+// Try to load main logger, fallback to simple logger
+let logger;
+try {
+  logger = require('../logger');
+  if (!logger.createLogger) {
+    logger = simpleLogger;
+  }
+} catch (error) {
+  logger = simpleLogger;
+}
 
 class NativeAgentLightning {
   /**
@@ -444,7 +463,14 @@ class NativeAgentLightning {
    */
   _estimateMemoryUsage() {
     // This is a rough estimate - in a real implementation, we'd track actual memory usage
-    return Math.round(performance.memoryUsage().heapUsed / 1024 / 1024);
+    try {
+      if (performance.memoryUsage) {
+        return Math.round(performance.memoryUsage().heapUsed / 1024 / 1024);
+      }
+    } catch (error) {
+      // Fallback if memory usage not available
+    }
+    return 10; // Default estimate of 10MB
   }
 }
 
