@@ -304,6 +304,61 @@
       ]
     },
     {
+      "id": "T1.8",
+      "title": "Implement init CLI command",
+      "description": "Create init command to initialize kc-orchestrator in project directories",
+      "acceptanceCriteria": [
+        "Creates .kc-orchestrator directory structure",
+        "Generates IMPLEMENTATION_GUIDE.json with initial structure",
+        "Creates NEXTSESSION_PROMPT.md template",
+        "Sets up .gitignore with appropriate entries",
+        "Supports --force, --minimal, and --verbose options",
+        "Prevents re-initialization without --force flag",
+        "Provides clear error messages and help text"
+      ],
+      "constraints": {
+        "do": [
+          "Follow existing CLI command pattern",
+          "Use atomic file operations",
+          "Provide comprehensive error handling",
+          "Support both minimal and full initialization modes",
+          "Include proper validation of directory creation"
+        ],
+        "dont": [
+          "Overwrite existing files without warning",
+          "Assume write permissions are always available",
+          "Create unnecessary files in minimal mode"
+        ]
+      },
+      "outputs": [
+        "src/cli/init.js",
+        "bin/cli.js (updated)",
+        ".kc-orchestrator/ directory structure",
+        "IMPLEMENTATION_GUIDE.json",
+        "NEXTSESSION_PROMPT.md",
+        ".gitignore"
+      ],
+      "checkSteps": [
+        "kc-orchestrator init --help",
+        "kc-orchestrator init --minimal --verbose",
+        "test -d .kc-orchestrator && test -f IMPLEMENTATION_GUIDE.json",
+        "kc-orchestrator init --force (in already initialized directory)"
+      ],
+      "status": "completed",
+      "effort": "S",
+      "dependencies": [
+        "T1.1",
+        "T1.7"
+      ],
+      "source": "user-request",
+      "metadata": {
+        "requestId": "USER-20241214-001",
+        "category": "cli",
+        "priority": "high",
+        "generatedAt": "2024-12-14T17:00:00.000Z"
+      }
+    },
+    {
       "id": "T2.1",
       "title": "Create CLI provider interface",
       "description": "Define abstract interface for CLI-based AI providers with focus on stdin/stdout and exit codes",

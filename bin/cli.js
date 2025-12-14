@@ -33,6 +33,10 @@ Examples:
 // Add improve command
 improveCommand(program);
 
+// Add init command
+const { initCommand } = require('../src/cli/init');
+initCommand(program);
+
 // Parse arguments
 program.parse(process.argv);
 
