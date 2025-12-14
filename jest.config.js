@@ -26,7 +26,6 @@ module.exports = {
   // Ignore patterns
   testPathIgnorePatterns: [
     '/node_modules/',
-    '/agent-lightning/',
     '/dashboard/',
     '/test-logs/'
   ],
