@@ -792,13 +792,21 @@ class TaskExecutionEngine {
         
         // If task failed after all attempts, handle failure
         if (lastError) {
+          const normalized = require('./utils/taskExtractor').normalizeTask(task);
+          const finalTaskId = normalized.id || task.id || lastError.taskId || (lastError.task && lastError.task.id) || 'unknown';
           results.failed++;
           results.executionLog.push({
-            taskId: lastError.taskId || (lastError.task && lastError.task.id) || 'unknown',
+            taskId: finalTaskId,
             status: 'failed',
             error: lastError.message,
             errorType: this.classifyError(lastError)
           });
+          
+          if (this.verbose) {
+            console.log(`\n❌ Task ${i + 1}/${tasks.length} failed after ${this.maxRetries} attempts`);
+            console.log(`   Task ID: ${finalTaskId}`);
+            console.log(`   Progress: ${results.completed} completed, ${results.failed} failed, ${tasks.length - i - 1} remaining`);
+          }
           
           // Request manual intervention for configuration errors
           if (this.classifyError(lastError) === 'configuration') {
