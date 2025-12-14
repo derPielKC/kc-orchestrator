@@ -1,0 +1,267 @@
+{
+  "project": "agent-lightning",
+  "analysisDate": "2024-12-15",
+  "totalFiles": 142,
+  "totalDirectories": 28,
+  "components": {
+    "core": [
+      {
+        "name": "client.py",
+        "path": "agentlightning/client.py",
+        "language": "Python",
+        "purpose": "Main client interface for Agent Lightning",
+        "dependencies": ["config.py", "algorithm/base.py", "tracer/base.py"],
+        "size": 4218,
+        "linesOfCode": 142,
+        "integrationPoints": [
+          "analyze_telemetry()",
+          "generate_recommendations()",
+          "get_health_status()",
+          "validate_configuration()"
+        ],
+        "requiredForIntegration": true,
+        "complexity": "medium"
+      },
+      {
+        "name": "config.py",
+        "path": "agentlightning/config.py",
+        "language": "Python",
+        "purpose": "Configuration management and validation",
+        "dependencies": ["pydantic", "env_var.py"],
+        "size": 3102,
+        "linesOfCode": 98,
+        "integrationPoints": [
+          "load_configuration()",
+          "validate_config()",
+          "get_default_config()"
+        ],
+        "requiredForIntegration": true,
+        "complexity": "low"
+      },
+      {
+        "name": "algorithm/base.py",
+        "path": "agentlightning/algorithm/base.py",
+        "language": "Python",
+        "purpose": "Base algorithm classes and interfaces",
+        "dependencies": ["abc", "typing", "algorithm/utils.py"],
+        "size": 2876,
+        "linesOfCode": 89,
+        "integrationPoints": [
+          "BaseAlgorithm",
+          "TelemetryAnalyzer",
+          "RecommendationEngine"
+        ],
+        "requiredForIntegration": true,
+        "complexity": "medium"
+      },
+      {
+        "name": "algorithm/utils.py",
+        "path": "agentlightning/algorithm/utils.py",
+        "language": "Python",
+        "purpose": "Algorithm utilities and helper functions",
+        "dependencies": ["numpy", "pandas", "typing"],
+        "size": 5123,
+        "linesOfCode": 172,
+        "integrationPoints": [
+          "calculate_failure_rates()",
+          "detect_retry_patterns()",
+          "identify_bottlenecks()",
+          "calculate_statistics()"
+        ],
+        "requiredForIntegration": true,
+        "complexity": "high"
+      },
+      {
+        "name": "tracer/base.py",
+        "path": "agentlightning/tracer/base.py",
+        "language": "Python",
+        "purpose": "Base tracing functionality",
+        "dependencies": ["opentelemetry", "typing"],
+        "size": 1892,
+        "linesOfCode": 61,
+        "integrationPoints": [
+          "BaseTracer",
+          "TelemetryTracer",
+          "start_span()",
+          "end_span()"
+        ],
+        "requiredForIntegration": false,
+        "complexity": "low",
+        "notes": "kc-orchestrator has its own tracing, but we may want to keep compatibility"
+      }
+    ],
+    "optional": [
+      {
+        "name": "store/memory.py",
+        "path": "agentlightning/store/memory.py",
+        "language": "Python",
+        "purpose": "In-memory storage for telemetry data",
+        "dependencies": ["typing"],
+        "size": 1567,
+        "linesOfCode": 49,
+        "integrationPoints": [
+          "MemoryStore",
+          "get_events()",
+          "store_event()"
+        ],
+        "requiredForIntegration": false,
+        "complexity": "low",
+        "notes": "kc-orchestrator has its own storage, but useful for testing"
+      },
+      {
+        "name": "types/core.py",
+        "path": "agentlightning/types/core.py",
+        "language": "Python",
+        "purpose": "Core type definitions",
+        "dependencies": ["typing", "pydantic"],
+        "size": 2345,
+        "linesOfCode": 76,
+        "integrationPoints": [
+          "RunEvent",
+          "TelemetryData",
+          "Recommendation"
+        ],
+        "requiredForIntegration": true,
+        "complexity": "medium",
+        "notes": "Need to port these types to TypeScript interfaces"
+      }
+    ],
+    "notNeeded": [
+      {
+        "name": "cli/*",
+        "path": "agentlightning/cli/",
+        "language": "Python",
+        "purpose": "CLI tools and utilities",
+        "dependencies": [],
+        "requiredForIntegration": false,
+        "notes": "kc-orchestrator has its own CLI"
+      },
+      {
+        "name": "execution/*",
+        "path": "agentlightning/execution/",
+        "language": "Python",
+        "purpose": "Execution frameworks",
+        "dependencies": [],
+        "requiredForIntegration": false,
+        "notes": "Not relevant for our use case"
+      },
+      {
+        "name": "instrumentation/*",
+        "path": "agentlightning/instrumentation/",
+        "language": "Python",
+        "purpose": "External instrumentation",
+        "dependencies": [],
+        "requiredForIntegration": false,
+        "notes": "kc-orchestrator uses its own instrumentation"
+      },
+      {
+        "name": "verl/*",
+        "path": "agentlightning/verl/",
+        "language": "Python",
+        "purpose": "VERL specific components",
+        "dependencies": [],
+        "requiredForIntegration": false,
+        "notes": "VERL is a different framework"
+      },
+      {
+        "name": "trainer/*",
+        "path": "agentlightning/trainer/",
+        "language": "Python",
+        "purpose": "Training components",
+        "dependencies": [],
+        "requiredForIntegration": false,
+        "notes": "Not needed for analysis functionality"
+      }
+    ]
+  },
+  "dependencyAnalysis": {
+    "external": {
+      "pydantic": {
+        "version": "^1.8.0",
+        "purpose": "Data validation and settings management",
+        "replacement": "Joi or Zod for JavaScript",
+        "complexity": "medium"
+      },
+      "numpy": {
+        "version": "^1.20.0",
+        "purpose": "Numerical computations",
+        "replacement": "Native JavaScript math or specialized libraries",
+        "complexity": "high"
+      },
+      "pandas": {
+        "version": "^1.2.0",
+        "purpose": "Data analysis and manipulation",
+        "replacement": "Custom data structures or Danfo.js",
+        "complexity": "high"
+      },
+      "opentelemetry": {
+        "version": "^1.0.0",
+        "purpose": "Tracing and observability",
+        "replacement": "Already used in kc-orchestrator",
+        "complexity": "low"
+      },
+      "requests": {
+        "version": "^2.25.0",
+        "purpose": "HTTP requests",
+        "replacement": "Node.js fetch or axios",
+        "complexity": "low"
+      }
+    },
+    "internal": {
+      "client.py": ["config.py", "algorithm/base.py", "tracer/base.py"],
+      "config.py": ["env_var.py"],
+      "algorithm/base.py": ["algorithm/utils.py"],
+      "algorithm/utils.py": []
+    }
+  },
+  "integrationPoints": {
+    "current": {
+      "method": "child_process.spawn()",
+      "input": "JSON files",
+      "output": "JSON files",
+      "errorHandling": "graceful fallback",
+      "configuration": "AGENT_LIGHTNING_CLI environment variable"
+    },
+    "target": {
+      "method": "direct function calls",
+      "input": "JavaScript objects",
+      "output": "JavaScript objects",
+      "errorHandling": "native exceptions",
+      "configuration": "configuration file + environment variables"
+    }
+  },
+  "performance": {
+    "external": {
+      "processStartup": "100-300ms",
+      "ipcOverhead": "50-150ms",
+      "totalOverhead": "150-450ms per call",
+      "memoryUsage": "Additional Python process"
+    },
+    "nativeTarget": {
+      "functionCall": "<1ms",
+      "noIpcOverhead": "0ms",
+      "totalImprovement": "150-450ms per call",
+      "memoryUsage": "Shared with main process"
+    }
+  },
+  "recommendations": {
+    "immediate": [
+      "Port client.py functionality to NativeAgentLightning class",
+      "Implement algorithm/utils.py in JavaScript first (highest complexity)",
+      "Create TypeScript interfaces for all data types",
+      "Implement configuration management natively"
+    ],
+    "longTerm": [
+      "Gradual migration with feature flags",
+      "Comprehensive test suite comparing outputs",
+      "Performance benchmarking",
+      "Clear migration documentation"
+    ],
+    "testing": [
+      "Create test data from existing runs",
+      "Compare outputs between native and external implementations",
+      "Performance benchmarks",
+      "Edge case testing"
+    ]
+  }
+}

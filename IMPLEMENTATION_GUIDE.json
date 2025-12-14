@@ -1765,6 +1765,300 @@
         "reportFormats": "text, lcov, clover, json-summary",
         "coverageReportGenerated": "coverage/lcov-report/index.html"
       }
+    },
+    {
+      "id": "T9.1",
+      "title": "Analyze Agent Lightning requirements and dependencies",
+      "description": "Analyze the agent-lightning directory to understand core components, dependencies, and integration points",
+      "acceptanceCriteria": [
+        "Complete inventory of agent-lightning files and their purposes",
+        "Dependency graph showing relationships between components",
+        "List of external dependencies required",
+        "Identification of core functionality needed for kc-orchestrator",
+        "Documentation of current integration points"
+      ],
+      "constraints": {
+        "do": [
+          "Focus on components actually used by kc-orchestrator",
+          "Identify minimal viable subset for integration",
+          "Document both Python and JavaScript components",
+          "Create visual dependency diagram"
+        ],
+        "dont": [
+          "Include unused or experimental components",
+          "Assume all components are equally important",
+          "Modify existing agent-lightning files during analysis"
+        ]
+      },
+      "outputs": [
+        "docs/agent-lightning-analysis.md",
+        "agent-lightning/dependency-graph.svg",
+        "agent-lightning/component-inventory.json"
+      ],
+      "checkSteps": [
+        "test -f docs/agent-lightning-analysis.md",
+        "cat agent-lightning/component-inventory.json | jq '.components | length'",
+        "ls -la agent-lightning/dependency-graph.svg"
+      ],
+      "status": "completed",
+      "effort": "S",
+      "dependencies": [],
+      "source": "user-request",
+      "metadata": {
+        "requestId": "USER-20241215-001",
+        "category": "integration",
+        "priority": "high",
+        "generatedAt": "2024-12-15T10:00:00.000Z"
+      }
+    },
+    {
+      "id": "T9.2",
+      "title": "Create native Agent Lightning wrapper module",
+      "description": "Create a native JavaScript wrapper that encapsulates Agent Lightning functionality without external dependencies",
+      "acceptanceCriteria": [
+        "Native JavaScript module that replicates Agent Lightning core functionality",
+        "No external process calls or Python dependencies",
+        "Implements telemetry analysis and recommendation generation",
+        "Supports both synchronous and asynchronous operation modes",
+        "Comprehensive error handling and fallback mechanisms"
+      ],
+      "constraints": {
+        "do": [
+          "Use pure JavaScript/TypeScript implementation",
+          "Implement core analysis algorithms natively",
+          "Support configurable analysis parameters",
+          "Include comprehensive logging",
+          "Maintain API compatibility with existing integration"
+        ],
+        "dont": [
+          "Use child_process to call external tools",
+          "Require Python or other runtime dependencies",
+          "Reimplement unnecessary components",
+          "Break existing kc-orchestrator API contracts"
+        ]
+      },
+      "outputs": [
+        "src/agent-lightning/NativeAgentLightning.js",
+        "src/agent-lightning/types.js",
+        "src/agent-lightning/utils.js"
+      ],
+      "checkSteps": [
+        "node -e \"const AGL = require('./src/agent-lightning/NativeAgentLightning'); console.log(new AGL().analyze());\"",
+        "test -f src/agent-lightning/types.js",
+        "grep -c 'class NativeAgentLightning' src/agent-lightning/NativeAgentLightning.js"
+      ],
+      "status": "pending",
+      "effort": "M",
+      "dependencies": [
+        "T9.1"
+      ],
+      "source": "user-request",
+      "metadata": {
+        "requestId": "USER-20241215-002",
+        "category": "implementation",
+        "priority": "high",
+        "generatedAt": "2024-12-15T10:00:00.000Z"
+      }
+    },
+    {
+      "id": "T9.3",
+      "title": "Extract and integrate core analysis algorithms",
+      "description": "Extract essential analysis algorithms from agent-lightning and implement them natively in JavaScript",
+      "acceptanceCriteria": [
+        "Telemetry pattern detection algorithms implemented",
+        "Pain point identification and categorization",
+        "Recommendation generation with prioritization",
+        "Performance analysis and bottleneck detection",
+        "Statistical analysis utilities"
+      ],
+      "constraints": {
+        "do": [
+          "Port Python algorithms to JavaScript faithfully",
+          "Maintain algorithmic complexity and accuracy",
+          "Add comprehensive unit tests for each algorithm",
+          "Support configurable thresholds and parameters",
+          "Document mathematical foundations"
+        ],
+        "dont": [
+          "Reimplement algorithms without understanding them",
+          "Introduce floating-point precision issues",
+          "Remove safety checks or validations",
+          "Change algorithm behavior without justification"
+        ]
+      },
+      "outputs": [
+        "src/agent-lightning/algorithms/patternDetection.js",
+        "src/agent-lightning/algorithms/painPointAnalysis.js",
+        "src/agent-lightning/algorithms/recommendationEngine.js",
+        "test/agent-lightning/algorithms.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const algo = require('./src/agent-lightning/algorithms/patternDetection'); console.log(algo.detectPatterns([{type: 'test'}]));\"",
+        "npm test -- agent-lightning/algorithms",
+        "ls -la src/agent-lightning/algorithms/ | wc -l"
+      ],
+      "status": "pending",
+      "effort": "L",
+      "dependencies": [
+        "T9.2"
+      ],
+      "source": "user-request",
+      "metadata": {
+        "requestId": "USER-20241215-003",
+        "category": "implementation",
+        "priority": "high",
+        "generatedAt": "2024-12-15T10:00:00.000Z"
+      }
+    },
+    {
+      "id": "T9.4",
+      "title": "Replace external Agent Lightning calls with native implementation",
+      "description": "Update AgentLightningIntegration to use native implementation instead of external CLI calls",
+      "acceptanceCriteria": [
+        "AgentLightningIntegration uses native module instead of child_process",
+        "All existing functionality preserved",
+        "Configuration supports both native and external modes",
+        "Performance improved without external process overhead",
+        "Comprehensive backward compatibility"
+      ],
+      "constraints": {
+        "do": [
+          "Maintain exact same API surface",
+          "Preserve all configuration options",
+          "Add feature flags for gradual migration",
+          "Include performance benchmarks",
+          "Document migration path"
+        ],
+        "dont": [
+          "Break existing API contracts",
+          "Remove external mode support prematurely",
+          "Change error handling behavior",
+          "Remove configuration validation"
+        ]
+      },
+      "outputs": [
+        "src/telemetry/AgentLightningIntegration.js (updated)",
+        "src/agent-lightning/integration.js",
+        "test/agent-lightning/integration.test.js"
+      ],
+      "checkSteps": [
+        "node -e \"const AGL = require('./src/telemetry/AgentLightningIntegration'); console.log(new AGL().invokeAgentLightning());\"",
+        "npm test -- agent-lightning/integration",
+        "kc-orchestrator improve --last 1 --verbose"
+      ],
+      "status": "pending",
+      "effort": "M",
+      "dependencies": [
+        "T9.3"
+      ],
+      "source": "user-request",
+      "metadata": {
+        "requestId": "USER-20241215-004",
+        "category": "integration",
+        "priority": "high",
+        "generatedAt": "2024-12-15T10:00:00.000Z"
+      }
+    },
+    {
+      "id": "T9.5",
+      "title": "Create comprehensive test suite for native Agent Lightning",
+      "description": "Develop complete test coverage for native Agent Lightning implementation",
+      "acceptanceCriteria": [
+        "Unit tests for all core algorithms",
+        "Integration tests for end-to-end workflows",
+        "Performance tests comparing native vs external",
+        "Edge case testing for unusual input patterns",
+        "Regression test suite"
+      ],
+      "constraints": {
+        "do": [
+          "Achieve >90% code coverage",
+          "Test both success and failure scenarios",
+          "Include performance benchmarks",
+          "Support mocking for isolation testing",
+          "Document test scenarios"
+        ],
+        "dont": [
+          "Create tests that depend on external systems",
+          "Test implementation details unnecessarily",
+          "Create overly complex test setups",
+          "Remove existing test coverage"
+        ]
+      },
+      "outputs": [
+        "test/agent-lightning/unit.test.js",
+        "test/agent-lightning/integration.test.js",
+        "test/agent-lightning/performance.test.js",
+        "test/agent-lightning/regression.test.js"
+      ],
+      "checkSteps": [
+        "npm test -- agent-lightning",
+        "jest --coverage | grep agent-lightning",
+        "node scripts/run-benchmark.js --agent-lightning",
+        "cat test/agent-lightning/performance.test.js | grep -c 'benchmark'"
+      ],
+      "status": "pending",
+      "effort": "L",
+      "dependencies": [
+        "T9.4"
+      ],
+      "source": "user-request",
+      "metadata": {
+        "requestId": "USER-20241215-005",
+        "category": "testing",
+        "priority": "high",
+        "generatedAt": "2024-12-15T10:00:00.000Z"
+      }
+    },
+    {
+      "id": "T9.6",
+      "title": "Update documentation and migration guide",
+      "description": "Create comprehensive documentation for native Agent Lightning integration",
+      "acceptanceCriteria": [
+        "Migration guide from external to native mode",
+        "API documentation for native module",
+        "Performance comparison documentation",
+        "Troubleshooting guide",
+        "Configuration reference"
+      ],
+      "constraints": {
+        "do": [
+          "Include step-by-step migration instructions",
+          "Document all configuration options",
+          "Provide performance benchmark results",
+          "Include common error scenarios and solutions",
+          "Add examples for typical use cases"
+        ],
+        "dont": [
+          "Remove existing documentation",
+          "Assume users understand internal implementation",
+          "Document implementation details unnecessarily",
+          "Create overly complex examples"
+        ]
+      },
+      "outputs": [
+        "docs/agent-lightning/migration-guide.md",
+        "docs/agent-lightning/api-reference.md",
+        "docs/agent-lightning/performance.md",
+        "docs/agent-lightning/troubleshooting.md"
+      ],
+      "checkSteps": [
+        "test -f docs/agent-lightning/migration-guide.md",
+        "cat docs/agent-lightning/api-reference.md | grep -c '##'",
+        "ls -la docs/agent-lightning/ | wc -l"
+      ],
+      "status": "pending",
+      "effort": "M",
+      "dependencies": [
+        "T9.5"
+      ],
+      "source": "user-request",
+      "metadata": {
+        "requestId": "USER-20241215-006",
+        "category": "documentation",
+        "priority": "medium",
+        "generatedAt": "2024-12-15T10:00:00.000Z"
+      }
     }
   ]
 }
