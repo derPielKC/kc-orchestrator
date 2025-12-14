@@ -1847,7 +1847,7 @@
         "test -f src/agent-lightning/types.js",
         "grep -c 'class NativeAgentLightning' src/agent-lightning/NativeAgentLightning.js"
       ],
-      "status": "in_progress",
+      "status": "completed",
       "effort": "M",
       "dependencies": [
         "T9.1"
