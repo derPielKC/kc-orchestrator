@@ -1946,7 +1946,7 @@
         "npm test -- agent-lightning/integration",
         "kc-orchestrator improve --last 1 --verbose"
       ],
-      "status": "pending",
+      "status": "in_progress",
       "effort": "M",
       "dependencies": [
         "T9.3"

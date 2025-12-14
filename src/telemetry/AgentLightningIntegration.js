@@ -2,11 +2,15 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+// Import native implementation
+const NativeAgentLightningIntegration = require('../agent-lightning/integration');
+
 /**
  * Agent Lightning Integration - Handles communication with Agent Lightning
  *
  * This class provides functionality to invoke Agent Lightning with telemetry data
  * and parse its recommendations for continuous improvement.
+ * Supports both native JavaScript implementation and external CLI calls.
  */
 class AgentLightningIntegration {
   /**
@@ -15,14 +19,25 @@ class AgentLightningIntegration {
    * @param {object} options - Configuration options
    * @param {string} options.agentLightningCli - Path to Agent Lightning CLI
    * @param {boolean} options.verbose - Enable verbose logging
+   * @param {string} options.mode - Mode: 'native', 'external', or 'hybrid'
    */
   constructor(options = {}) {
     this.agentLightningCli = options.agentLightningCli || process.env.AGENT_LIGHTNING_CLI || 'agl';
     this.verbose = options.verbose || false;
     this.baseDir = path.join(process.cwd(), '.kc-orchestrator', 'agent-lightning');
     
+    // Initialize native integration
+    this.nativeIntegration = new NativeAgentLightningIntegration({
+      mode: options.mode || 'native',
+      verbose: this.verbose
+    });
+    
     // Ensure base directory exists
     this._ensureBaseDirectory();
+    
+    if (this.verbose) {
+      console.log(`🔧 AgentLightningIntegration initialized in ${this.nativeIntegration.getCurrentMode()} mode`);
+    }
   }
   
   /**
@@ -50,6 +65,51 @@ class AgentLightningIntegration {
    * @returns {object} Agent Lightning response
    */
   async invokeAgentLightning(summaryReport, runData, options = {}) {
+    const startTime = Date.now();
+    
+    try {
+      // Use native implementation by default
+      const result = await this.nativeIntegration.invokeAgentLightning(summaryReport, runData, options);
+      
+      // Add compatibility layer for existing code
+      const compatibleResult = this._convertToLegacyFormat(result);
+      
+      if (this.verbose) {
+        console.log(`✅ Agent Lightning (native) completed in ${Date.now() - startTime}ms`);
+        console.log(`   Patterns: ${result.patterns.length}`);
+        console.log(`   Pain Points: ${result.painPoints.length}`);
+        console.log(`   Recommendations: ${result.recommendations.length}`);
+      }
+      
+      return compatibleResult;
+      
+    } catch (error) {
+      console.error(`❌ Agent Lightning invocation failed: ${error.message}`);
+      
+      // Fallback to external implementation if native fails and fallback is enabled
+      if (this.nativeIntegration.getConfiguration().fallback.enabled) {
+        console.warn('⚠️  Falling back to external Agent Lightning implementation');
+        return this._invokeExternalAgentLightning(summaryReport, runData, options);
+      }
+      
+      return {
+        success: false,
+        error: error.message,
+        recommendations: []
+      };
+    }
+  }
+
+  /**
+   * Invoke external Agent Lightning (fallback method)
+   * This is the original implementation using CLI calls
+   *
+   * @param {string} summaryReport - Markdown summary report
+   * @param {Array} runData - Array of run data objects
+   * @param {object} options - Additional options
+   * @returns {object} Agent Lightning response
+   */
+  async _invokeExternalAgentLightning(summaryReport, runData, options = {}) {
     const { projectName = 'kc-orchestrator', outputFormat = 'markdown' } = options;
     
     // Prepare input files
@@ -67,7 +127,7 @@ class AgentLightningIntegration {
       fs.writeFileSync(runsPath, JSON.stringify(runData, null, 2), 'utf8');
       
       if (this.verbose) {
-        console.log(`📄 Prepared input files for Agent Lightning`);
+        console.log(`📄 Prepared input files for external Agent Lightning`);
         console.log(`   Summary: ${summaryPath}`);
         console.log(`   Runs: ${runsPath}`);
       }
@@ -79,7 +139,7 @@ class AgentLightningIntegration {
       const command = this._buildAgentLightningCommand(summaryPath, runsPath, outputDir, projectName, outputFormat);
       
       if (this.verbose) {
-        console.log(`🚀 Executing Agent Lightning command:`);
+        console.log(`🚀 Executing external Agent Lightning command:`);
         console.log(`   ${command}`);
       }
       
@@ -90,19 +150,42 @@ class AgentLightningIntegration {
       const result = this._parseAgentLightningResponse(response, outputDir);
       
       if (this.verbose) {
-        console.log(`✅ Agent Lightning completed successfully`);
+        console.log(`✅ External Agent Lightning completed successfully`);
       }
       
       return result;
       
     } catch (error) {
-      console.error(`❌ Agent Lightning invocation failed: ${error.message}`);
+      console.error(`❌ External Agent Lightning invocation failed: ${error.message}`);
       return {
         success: false,
         error: error.message,
         recommendations: []
       };
     }
+  }
+
+  /**
+   * Convert native result to legacy format for backward compatibility
+   *
+   * @param {object} nativeResult - Native result format
+   * @returns {object} Legacy format result
+   */
+  _convertToLegacyFormat(nativeResult) {
+    // Native result already contains recommendations, so we just need to ensure
+    // the structure matches what existing code expects
+    return {
+      success: true,
+      recommendations: nativeResult.recommendations,
+      patterns: nativeResult.patterns,
+      painPoints: nativeResult.painPoints,
+      statistics: nativeResult.statistics,
+      metadata: nativeResult.metadata,
+      performance: nativeResult.performance,
+      // Add legacy fields if needed
+      ...(nativeResult.legacyData || {})
+    };
+  }
   }
   
   /**
