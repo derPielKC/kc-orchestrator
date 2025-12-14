@@ -241,10 +241,17 @@ kc-orchestrator init --verbose
 # Test force re-initialization
 kc-orchestrator init --force
 
+# Test preservation of existing files
+echo "Existing content" > IMPLEMENTATION_GUIDE.json
+echo "Existing prompt" > NEXTSESSION_PROMPT.md
+kc-orchestrator init --verbose
+cat IMPLEMENTATION_GUIDE.json  # Should show "Existing content"
+cat NEXTSESSION_PROMPT.md      # Should show "Existing prompt"
+
 # Verify created structure
 ls -la .kc-orchestrator/
-test -f IMPLEMENTATION_GUIDE.json && echo "Guide file created"
-test -f NEXTSESSION_PROMPT.md && echo "Prompt file created"
+test -f IMPLEMENTATION_GUIDE.json && echo "Guide file exists"
+test -f NEXTSESSION_PROMPT.md && echo "Prompt file exists"
 test -f .gitignore && echo "Gitignore created"
 ```
 
